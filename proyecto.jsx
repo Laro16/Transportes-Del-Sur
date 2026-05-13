@@ -1,6 +1,6 @@
 const { useState, useEffect, useRef } = React;
 
-const STORAGE_KEY = "transportes_del_sur_borrador_v1";
+const STORAGE_KEY = "transportes_del_sur_borrador_v2";
 
 const INITIAL_FORM = {
     fecha: "",
@@ -212,7 +212,10 @@ const AppProyecto = () => {
             }
         }
 
-        if (formData.ubicacion && formData.ubicacion.includes("Obteniendo datos satelitales")) {
+        if (
+            formData.ubicacion &&
+            /obteniendo datos satelitales/i.test(String(formData.ubicacion))
+        ) {
             nextErrors.ubicacion = "Aún se está obteniendo la ubicación.";
         }
 
@@ -277,6 +280,31 @@ const AppProyecto = () => {
         return { fecha, hora };
     };
 
+    const fitTextSingleLine = (ctx, text, maxWidth) => {
+        const value = String(text || "");
+        if (ctx.measureText(value).width <= maxWidth) return value;
+
+        const ellipsis = "…";
+        let low = 0;
+        let high = value.length;
+        let best = "";
+
+        while (low <= high) {
+            const mid = Math.floor((low + high) / 2);
+            const candidate = value.slice(0, mid).trimEnd() + ellipsis;
+            const width = ctx.measureText(candidate).width;
+
+            if (width <= maxWidth) {
+                best = candidate;
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+
+        return best || ellipsis;
+    };
+
     const wrapText = (ctx, text, maxWidth) => {
         const words = String(text || "").split(" ");
         const lines = [];
@@ -313,54 +341,37 @@ const AppProyecto = () => {
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
                 const margin = Math.max(20, Math.round(canvas.width * 0.02));
-                const fontSize = Math.max(18, Math.round(canvas.width * 0.018));
-                const lineHeight = Math.round(fontSize * 1.35);
+                const fontSize = Math.max(14, Math.round(canvas.width * 0.013));
+                const lineHeight = Math.round(fontSize * 1.45);
 
-                ctx.font = `bold ${fontSize}px Arial`;
-                ctx.textBaseline = "top";
-
-                const lineasBase = [
+                const rows = [
                     `NEGOCIO: ${datos.negocio}`,
                     `FECHA: ${datos.fecha}`,
                     `HORA: ${datos.hora}`,
                     `DIRECCIÓN: ${datos.direccion}`,
                     `GPS: ${datos.lat}, ${datos.lon}`,
                     `ALTITUD: ${datos.altitud}`
-                ];
+                ].map(row => fitTextSingleLine(ctx, row, Math.round(canvas.width * 0.55)));
 
-                const maxTextWidth = Math.round(canvas.width * 0.42);
-                let lineas = [];
-
-                lineasBase.forEach((linea) => {
-                    const partes = wrapText(ctx, linea, maxTextWidth);
-                    lineas.push(...partes);
-                });
-
-                const widest = lineas.length
-                    ? Math.max(...lineas.map(l => ctx.measureText(l).width))
-                    : 0;
-
-                const boxWidth = Math.min(
-                    canvas.width * 0.55,
-                    widest + margin * 2
-                );
-
-                const boxHeight = lineas.length * lineHeight + margin * 2;
-
-                const x = canvas.width - boxWidth - margin;
-                const y = canvas.height - boxHeight - margin;
-
-                ctx.fillStyle = "rgba(0,0,0,0.50)";
-                ctx.fillRect(x, y, boxWidth, boxHeight);
-
+                ctx.font = `bold ${fontSize}px Arial`;
+                ctx.textBaseline = "top";
+                ctx.textAlign = "right";
                 ctx.fillStyle = "#FFFFFF";
-                ctx.shadowColor = "rgba(0,0,0,0.85)";
+                ctx.strokeStyle = "rgba(0,0,0,0.75)";
+                ctx.lineWidth = Math.max(2, Math.round(fontSize * 0.15));
+                ctx.shadowColor = "rgba(0,0,0,0.45)";
                 ctx.shadowBlur = 4;
                 ctx.shadowOffsetX = 1;
                 ctx.shadowOffsetY = 1;
 
-                lineas.forEach((linea, index) => {
-                    ctx.fillText(linea, x + margin, y + margin + (index * lineHeight));
+                const totalHeight = rows.length * lineHeight;
+                let y = canvas.height - margin - totalHeight;
+                const x = canvas.width - margin;
+
+                rows.forEach((linea) => {
+                    ctx.strokeText(linea, x, y);
+                    ctx.fillText(linea, x, y);
+                    y += lineHeight;
                 });
 
                 const finalBase64 = canvas.toDataURL("image/jpeg", 0.88);
@@ -372,6 +383,13 @@ const AppProyecto = () => {
         });
     };
 
+    const getTextoUbicacionSegura = () => {
+        const candidata = gpsInfo.direccion || formData.ubicacion || "";
+        if (!candidata) return "SIN UBICACIÓN REGISTRADA";
+        if (/obteniendo datos satelitales/i.test(String(candidata))) return "SIN UBICACIÓN REGISTRADA";
+        return candidata;
+    };
+
     const handleFoto = async (e, nombre) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -381,11 +399,13 @@ const AppProyecto = () => {
             const ahora = new Date();
             const { fecha, hora } = formatearFechaHora(ahora);
 
+            const ubicacionSegura = getTextoUbicacionSegura();
+
             const datosMarca = {
                 negocio: formData.negocio?.trim() || "NEGOCIO",
                 fecha,
                 hora,
-                direccion: gpsInfo.direccion || formData.ubicacion || "SIN UBICACIÓN",
+                direccion: ubicacionSegura,
                 lat: gpsInfo.lat || "N/D",
                 lon: gpsInfo.lon || "N/D",
                 altitud: gpsInfo.altitud || "N/D"
@@ -458,8 +478,8 @@ const AppProyecto = () => {
                             "";
 
                         const departamento = data.address.state || "";
-
                         const lugar = [municipio, departamento].filter(Boolean).join(", ");
+
                         if (lugar) {
                             textoUbicacion = `${lugar} (${lat}, ${lon})`;
                         }
@@ -475,7 +495,11 @@ const AppProyecto = () => {
                     direccion: textoUbicacion
                 });
 
-                setFormData(prev => ({ ...prev, ubicacion: textoUbicacion }));
+                setFormData(prev => ({
+                    ...prev,
+                    ubicacion: textoUbicacion
+                }));
+
                 setObteniendoGPS(false);
             },
             (error) => {

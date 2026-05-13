@@ -1,7 +1,7 @@
 const { useState, useEffect, useRef } = React;
 
-const STORAGE_KEY = "transportes_del_sur_borrador_v3";
-const SUPABASE_BUCKET = "instalaciones";
+const STORAGE_KEY = "transportes_del_sur_borrador_v4";
+const SUPABASE_BUCKET = "Instalaciones";
 const SUPABASE_TABLE = "instalaciones";
 
 const INITIAL_FORM = {
@@ -153,7 +153,7 @@ const AppProyecto = () => {
 
     const getSupabase = () => {
         if (!window.supabaseClient) {
-            throw new Error("Supabase no está inicializado.");
+            throw new Error("Supabase no está inicializado. Revisa supabase.js.");
         }
         return window.supabaseClient;
     };
@@ -511,18 +511,10 @@ const AppProyecto = () => {
         URL.revokeObjectURL(url);
     };
 
-    const blobToBase64 = (blob) => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
-    };
-
-    const dataURLToBlob = async (dataURL) => {
-        const response = await fetch(dataURL);
-        return await response.blob();
+    const base64ToBlob = async (base64, mimeType = "image/jpeg") => {
+        const res = await fetch(base64);
+        const blob = await res.blob();
+        return new Blob([blob], { type: mimeType });
     };
 
     const uploadBlobToSupabase = async (blob, path, contentType) => {
@@ -532,8 +524,8 @@ const AppProyecto = () => {
             .storage
             .from(SUPABASE_BUCKET)
             .upload(path, blob, {
-                contentType,
-                upsert: true
+                upsert: true,
+                contentType
             });
 
         if (uploadError) {
@@ -697,17 +689,17 @@ const AppProyecto = () => {
             const uploads = await Promise.all([
                 uploadBlobToSupabase(
                     pdfBlob,
-                    `${baseFolder}/pdfs/${pdfName}`,
+                    `${baseFolder}/Pdfs/${pdfName}`,
                     "application/pdf"
                 ),
                 uploadBlobToSupabase(
                     xlsxBlob,
-                    `${baseFolder}/excels/${xlsxName}`,
+                    `${baseFolder}/Excel/${xlsxName}`,
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 ),
                 uploadBlobToSupabase(
                     imageBlob,
-                    `${baseFolder}/imagenes/${imageName}`,
+                    `${baseFolder}/Imagenes/${imageName}`,
                     "image/jpeg"
                 )
             ]);
@@ -897,7 +889,9 @@ const AppProyecto = () => {
                     <p><span className="font-bold text-blue-800">Negocio:</span> {formData.negocio}</p>
                     <p><span className="font-bold text-blue-800">Cliente:</span> {formData.cliente}</p>
                     <p><span className="font-bold text-blue-800">Teléfono:</span> {formData.telefono}</p>
-                    <p className="col-span-2"><span className="font-bold text-blue-800">Ubicación/GPS:</span> {formData.ubicacion}</p>
+                    <p className="col-span-2">
+                        <span className="font-bold text-blue-800">Ubicación/GPS:</span> {formData.ubicacion}
+                    </p>
                     <p><span className="font-bold text-blue-800">Contrato:</span> {formData.contrato}</p>
                     <p><span className="font-bold text-blue-800">Código Eq:</span> {formData.codigo}</p>
                     <p><span className="font-bold text-blue-800">Serie Eq:</span> {formData.serie}</p>

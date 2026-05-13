@@ -1,6 +1,8 @@
 const { useState, useEffect, useRef } = React;
 
-const STORAGE_KEY = "transportes_del_sur_borrador_v2";
+const STORAGE_KEY = "transportes_del_sur_borrador_v3";
+const SUPABASE_BUCKET = "instalaciones";
+const SUPABASE_TABLE = "instalaciones";
 
 const INITIAL_FORM = {
     fecha: "",
@@ -37,7 +39,6 @@ const AppProyecto = () => {
     const [gpsInfo, setGpsInfo] = useState({
         lat: "",
         lon: "",
-        altitud: "",
         direccion: ""
     });
     const [errors, setErrors] = useState({});
@@ -128,7 +129,6 @@ const AppProyecto = () => {
         setGpsInfo({
             lat: "",
             lon: "",
-            altitud: "",
             direccion: ""
         });
         setErrors({});
@@ -149,6 +149,20 @@ const AppProyecto = () => {
             .replace(/[\\/:*?"<>|]/g, "-")
             .replace(/\s+/g, "_")
             .slice(0, 80) || "registro";
+    };
+
+    const getSupabase = () => {
+        if (!window.supabaseClient) {
+            throw new Error("Supabase no está inicializado.");
+        }
+        return window.supabaseClient;
+    };
+
+    const buildRegistroId = () => {
+        if (window.crypto && typeof window.crypto.randomUUID === "function") {
+            return window.crypto.randomUUID();
+        }
+        return `reg_${Date.now()}_${Math.random().toString(16).slice(2)}`;
     };
 
     const handleLogin = (e) => {
@@ -287,7 +301,7 @@ const AppProyecto = () => {
         const ellipsis = "…";
         let low = 0;
         let high = value.length;
-        let best = "";
+        let best = ellipsis;
 
         while (low <= high) {
             const mid = Math.floor((low + high) / 2);
@@ -302,29 +316,7 @@ const AppProyecto = () => {
             }
         }
 
-        return best || ellipsis;
-    };
-
-    const wrapText = (ctx, text, maxWidth) => {
-        const words = String(text || "").split(" ");
-        const lines = [];
-        let line = "";
-
-        for (let n = 0; n < words.length; n++) {
-            const testLine = line + words[n] + " ";
-            const metrics = ctx.measureText(testLine);
-            const testWidth = metrics.width;
-
-            if (testWidth > maxWidth && n > 0) {
-                lines.push(line.trim());
-                line = words[n] + " ";
-            } else {
-                line = testLine;
-            }
-        }
-
-        if (line.trim()) lines.push(line.trim());
-        return lines;
+        return best;
     };
 
     const estamparDatosEnImagen = (base64, datos) => {
@@ -344,15 +336,6 @@ const AppProyecto = () => {
                 const fontSize = Math.max(14, Math.round(canvas.width * 0.013));
                 const lineHeight = Math.round(fontSize * 1.45);
 
-                const rows = [
-                    `NEGOCIO: ${datos.negocio}`,
-                    `FECHA: ${datos.fecha}`,
-                    `HORA: ${datos.hora}`,
-                    `DIRECCIÓN: ${datos.direccion}`,
-                    `GPS: ${datos.lat}, ${datos.lon}`,
-                    `ALTITUD: ${datos.altitud}`
-                ].map(row => fitTextSingleLine(ctx, row, Math.round(canvas.width * 0.55)));
-
                 ctx.font = `bold ${fontSize}px Arial`;
                 ctx.textBaseline = "top";
                 ctx.textAlign = "right";
@@ -363,6 +346,14 @@ const AppProyecto = () => {
                 ctx.shadowBlur = 4;
                 ctx.shadowOffsetX = 1;
                 ctx.shadowOffsetY = 1;
+
+                const rows = [
+                    `NEGOCIO: ${datos.negocio}`,
+                    `FECHA: ${datos.fecha}`,
+                    `HORA: ${datos.hora}`,
+                    `DIRECCIÓN: ${datos.direccion}`,
+                    `GPS: ${datos.lat}, ${datos.lon}`
+                ].map(row => fitTextSingleLine(ctx, row, Math.round(canvas.width * 0.55)));
 
                 const totalHeight = rows.length * lineHeight;
                 let y = canvas.height - margin - totalHeight;
@@ -399,16 +390,13 @@ const AppProyecto = () => {
             const ahora = new Date();
             const { fecha, hora } = formatearFechaHora(ahora);
 
-            const ubicacionSegura = getTextoUbicacionSegura();
-
             const datosMarca = {
                 negocio: formData.negocio?.trim() || "NEGOCIO",
                 fecha,
                 hora,
-                direccion: ubicacionSegura,
+                direccion: getTextoUbicacionSegura(),
                 lat: gpsInfo.lat || "N/D",
-                lon: gpsInfo.lon || "N/D",
-                altitud: gpsInfo.altitud || "N/D"
+                lon: gpsInfo.lon || "N/D"
             };
 
             const imagenFinal = await estamparDatosEnImagen(imagenComprimida, datosMarca);
@@ -457,10 +445,6 @@ const AppProyecto = () => {
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
 
-                const altitud = pos.coords.altitude !== null && pos.coords.altitude !== undefined
-                    ? `${pos.coords.altitude.toFixed(1)} m`
-                    : "N/D";
-
                 let textoUbicacion = `${lat}, ${lon}`;
 
                 try {
@@ -491,7 +475,6 @@ const AppProyecto = () => {
                 setGpsInfo({
                     lat: `${lat}`,
                     lon: `${lon}`,
-                    altitud,
                     direccion: textoUbicacion
                 });
 
@@ -509,7 +492,6 @@ const AppProyecto = () => {
                 setGpsInfo({
                     lat: "",
                     lon: "",
-                    altitud: "",
                     direccion: ""
                 });
                 setObteniendoGPS(false);
@@ -518,18 +500,60 @@ const AppProyecto = () => {
         );
     };
 
-    const descargarArchivo = (dataUrl, filename) => {
+    const descargarBlob = (blob, filename) => {
+        const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
-        link.href = dataUrl;
+        link.href = url;
         link.download = filename;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     };
 
-    const generarImagenWhatsApp = async () => {
+    const blobToBase64 = (blob) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    };
+
+    const dataURLToBlob = async (dataURL) => {
+        const response = await fetch(dataURL);
+        return await response.blob();
+    };
+
+    const uploadBlobToSupabase = async (blob, path, contentType) => {
+        const supabase = getSupabase();
+
+        const { error: uploadError } = await supabase
+            .storage
+            .from(SUPABASE_BUCKET)
+            .upload(path, blob, {
+                contentType,
+                upsert: true
+            });
+
+        if (uploadError) {
+            throw uploadError;
+        }
+
+        const { data } = supabase
+            .storage
+            .from(SUPABASE_BUCKET)
+            .getPublicUrl(path);
+
+        return {
+            path,
+            publicUrl: data.publicUrl
+        };
+    };
+
+    const generarImagenWhatsAppBlob = async () => {
         const areaCaptura = document.getElementById("molde-imagen-whatsapp");
-        if (!areaCaptura) return;
+        if (!areaCaptura) return null;
 
         const canvas = await window.html2canvas(areaCaptura, {
             scale: 3,
@@ -537,12 +561,12 @@ const AppProyecto = () => {
             backgroundColor: "#ffffff"
         });
 
-        const imagenFinalBase64 = canvas.toDataURL("image/jpeg", 0.88);
-        const fileName = `Resumen_${sanitizeFileName(formData.negocio)}_${formData.fecha}.jpg`;
-        descargarArchivo(imagenFinalBase64, fileName);
+        return await new Promise((resolve) => {
+            canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.88);
+        });
     };
 
-    const generarPDF = () => {
+    const generarPDFBlob = () => {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
 
@@ -590,11 +614,10 @@ const AppProyecto = () => {
             doc.addImage(base64, "JPEG", xOffset, marginY, finalWidth, finalHeight);
         }
 
-        const fileName = `Instalacion_${sanitizeFileName(formData.negocio)}_${formData.fecha}.pdf`;
-        doc.save(fileName);
+        return doc.output("blob");
     };
 
-    const generarXLSX = () => {
+    const generarXLSXBlob = () => {
         if (!window.XLSX) {
             throw new Error("La librería XLSX no está cargada.");
         }
@@ -627,8 +650,14 @@ const AppProyecto = () => {
         const wsEvidencias = window.XLSX.utils.json_to_sheet(evidencias);
         window.XLSX.utils.book_append_sheet(wb, wsEvidencias, "Evidencias");
 
-        const fileName = `registro_${sanitizeFileName(formData.negocio)}_${formData.fecha}.xlsx`;
-        window.XLSX.writeFile(wb, fileName);
+        const xlsxArray = window.XLSX.write(wb, {
+            bookType: "xlsx",
+            type: "array"
+        });
+
+        return new Blob([xlsxArray], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        });
     };
 
     const generarDocumentos = async (e) => {
@@ -644,10 +673,78 @@ const AppProyecto = () => {
 
         setGenerando(true);
 
+        const registroId = buildRegistroId();
+        const safeNegocio = sanitizeFileName(formData.negocio);
+        const safeFecha = sanitizeFileName(formData.fecha || "sin_fecha");
+        const baseFolder = `registros/${registroId}`;
+        const pdfName = `Instalacion_${safeNegocio}_${safeFecha}.pdf`;
+        const xlsxName = `registro_${safeNegocio}_${safeFecha}.xlsx`;
+        const imageName = `Resumen_${safeNegocio}_${safeFecha}.jpg`;
+
         try {
-            await generarImagenWhatsApp();
-            generarPDF();
-            generarXLSX();
+            const imageBlob = await generarImagenWhatsAppBlob();
+            const pdfBlob = generarPDFBlob();
+            const xlsxBlob = generarXLSXBlob();
+
+            if (!imageBlob) {
+                throw new Error("No se pudo generar la imagen para WhatsApp.");
+            }
+
+            descargarBlob(imageBlob, imageName);
+            descargarBlob(pdfBlob, pdfName);
+            descargarBlob(xlsxBlob, xlsxName);
+
+            const uploads = await Promise.all([
+                uploadBlobToSupabase(
+                    pdfBlob,
+                    `${baseFolder}/pdfs/${pdfName}`,
+                    "application/pdf"
+                ),
+                uploadBlobToSupabase(
+                    xlsxBlob,
+                    `${baseFolder}/excels/${xlsxName}`,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ),
+                uploadBlobToSupabase(
+                    imageBlob,
+                    `${baseFolder}/imagenes/${imageName}`,
+                    "image/jpeg"
+                )
+            ]);
+
+            const [pdfFile, xlsxFile, imageFile] = uploads;
+
+            const supabase = getSupabase();
+
+            const { error: insertError } = await supabase
+                .from(SUPABASE_TABLE)
+                .insert([{
+                    registro_id: registroId,
+                    fecha: formData.fecha,
+                    negocio: formData.negocio,
+                    cliente: formData.cliente,
+                    transportista: formData.transportista,
+                    placa: formData.placa,
+                    contrato: formData.contrato,
+                    codigo: formData.codigo,
+                    serie: formData.serie,
+                    modelo: formData.modelo,
+                    tipo: formData.tipo,
+                    telefono: formData.telefono,
+                    ubicacion: formData.ubicacion,
+                    latitud: gpsInfo.lat,
+                    longitud: gpsInfo.lon,
+                    pdf_url: pdfFile.publicUrl,
+                    excel_url: xlsxFile.publicUrl,
+                    imagen_url: imageFile.publicUrl,
+                    pdf_path: pdfFile.path,
+                    excel_path: xlsxFile.path,
+                    imagen_path: imageFile.path
+                }]);
+
+            if (insertError) {
+                throw insertError;
+            }
 
             skipDraftSaveRef.current = true;
             clearDraft();
@@ -657,10 +754,10 @@ const AppProyecto = () => {
                 skipDraftSaveRef.current = false;
             }, 0);
 
-            alert("¡Éxito! Se han descargado la imagen para WhatsApp, el PDF y el archivo Excel.");
+            alert("¡Éxito! Se generaron los archivos y se subieron a la nube.");
         } catch (error) {
             console.error("Error al generar documentos", error);
-            alert("Hubo un error al generar los documentos. Revisa la consola para más detalle.");
+            alert("Hubo un error al guardar en la nube o generar los archivos. Revisa la consola.");
         } finally {
             setGenerando(false);
         }

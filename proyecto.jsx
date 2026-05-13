@@ -34,6 +34,12 @@ const AppProyecto = () => {
     const [opciones, setOpciones] = useState({ transportistas: [], placas: [] });
     const [formData, setFormData] = useState(INITIAL_FORM);
     const [fotos, setFotos] = useState({});
+    const [gpsInfo, setGpsInfo] = useState({
+        lat: "",
+        lon: "",
+        altitud: "",
+        direccion: ""
+    });
     const [errors, setErrors] = useState({});
     const [obteniendoGPS, setObteniendoGPS] = useState(false);
     const [generando, setGenerando] = useState(false);
@@ -59,6 +65,10 @@ const AppProyecto = () => {
             if (parsed?.fotos) {
                 setFotos(parsed.fotos);
             }
+
+            if (parsed?.gpsInfo) {
+                setGpsInfo(prev => ({ ...prev, ...parsed.gpsInfo }));
+            }
         } catch (error) {
             console.error("No se pudo cargar el borrador", error);
         }
@@ -73,13 +83,14 @@ const AppProyecto = () => {
                 STORAGE_KEY,
                 JSON.stringify({
                     formData,
-                    fotos
+                    fotos,
+                    gpsInfo
                 })
             );
         } catch (error) {
             console.error("No se pudo guardar el borrador", error);
         }
-    }, [formData, fotos, isLoggedIn]);
+    }, [formData, fotos, gpsInfo, isLoggedIn]);
 
     useEffect(() => {
         if (!isLoggedIn) return;
@@ -114,6 +125,12 @@ const AppProyecto = () => {
     const resetForm = () => {
         setFormData(INITIAL_FORM);
         setFotos({});
+        setGpsInfo({
+            lat: "",
+            lon: "",
+            altitud: "",
+            direccion: ""
+        });
         setErrors({});
         setObteniendoGPS(false);
     };
@@ -243,21 +260,153 @@ const AppProyecto = () => {
         });
     };
 
-    const handleFoto = async (e, nombre) => {
-        const input = e.target;
-        const file = input.files?.[0];
+    const formatearFechaHora = (date = new Date()) => {
+        const fecha = new Intl.DateTimeFormat("es-GT", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric"
+        }).format(date);
 
+        const hora = new Intl.DateTimeFormat("es-GT", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: false
+        }).format(date);
+
+        return { fecha, hora };
+    };
+
+    const wrapText = (ctx, text, maxWidth) => {
+        const words = String(text || "").split(" ");
+        const lines = [];
+        let line = "";
+
+        for (let n = 0; n < words.length; n++) {
+            const testLine = line + words[n] + " ";
+            const metrics = ctx.measureText(testLine);
+            const testWidth = metrics.width;
+
+            if (testWidth > maxWidth && n > 0) {
+                lines.push(line.trim());
+                line = words[n] + " ";
+            } else {
+                line = testLine;
+            }
+        }
+
+        if (line.trim()) lines.push(line.trim());
+        return lines;
+    };
+
+    const estamparDatosEnImagen = (base64, datos) => {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                canvas.width = img.width;
+                canvas.height = img.height;
+
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                const margin = Math.max(20, Math.round(canvas.width * 0.02));
+                const fontSize = Math.max(18, Math.round(canvas.width * 0.018));
+                const lineHeight = Math.round(fontSize * 1.35);
+
+                ctx.font = `bold ${fontSize}px Arial`;
+                ctx.textBaseline = "top";
+
+                const lineasBase = [
+                    `NEGOCIO: ${datos.negocio}`,
+                    `FECHA: ${datos.fecha}`,
+                    `HORA: ${datos.hora}`,
+                    `DIRECCIÓN: ${datos.direccion}`,
+                    `GPS: ${datos.lat}, ${datos.lon}`,
+                    `ALTITUD: ${datos.altitud}`
+                ];
+
+                const maxTextWidth = Math.round(canvas.width * 0.42);
+                let lineas = [];
+
+                lineasBase.forEach((linea) => {
+                    const partes = wrapText(ctx, linea, maxTextWidth);
+                    lineas.push(...partes);
+                });
+
+                const widest = lineas.length
+                    ? Math.max(...lineas.map(l => ctx.measureText(l).width))
+                    : 0;
+
+                const boxWidth = Math.min(
+                    canvas.width * 0.55,
+                    widest + margin * 2
+                );
+
+                const boxHeight = lineas.length * lineHeight + margin * 2;
+
+                const x = canvas.width - boxWidth - margin;
+                const y = canvas.height - boxHeight - margin;
+
+                ctx.fillStyle = "rgba(0,0,0,0.50)";
+                ctx.fillRect(x, y, boxWidth, boxHeight);
+
+                ctx.fillStyle = "#FFFFFF";
+                ctx.shadowColor = "rgba(0,0,0,0.85)";
+                ctx.shadowBlur = 4;
+                ctx.shadowOffsetX = 1;
+                ctx.shadowOffsetY = 1;
+
+                lineas.forEach((linea, index) => {
+                    ctx.fillText(linea, x + margin, y + margin + (index * lineHeight));
+                });
+
+                const finalBase64 = canvas.toDataURL("image/jpeg", 0.88);
+                resolve(finalBase64);
+            };
+
+            img.onerror = reject;
+            img.src = base64;
+        });
+    };
+
+    const handleFoto = async (e, nombre) => {
+        const file = e.target.files[0];
         if (!file) return;
 
         try {
             const imagenComprimida = await comprimirImagen(file);
-            setFotos(prev => ({ ...prev, [nombre]: imagenComprimida }));
-            setErrors(prev => ({ ...prev, [`foto_${nombre}`]: "" }));
+            const ahora = new Date();
+            const { fecha, hora } = formatearFechaHora(ahora);
+
+            const datosMarca = {
+                negocio: formData.negocio?.trim() || "NEGOCIO",
+                fecha,
+                hora,
+                direccion: gpsInfo.direccion || formData.ubicacion || "SIN UBICACIÓN",
+                lat: gpsInfo.lat || "N/D",
+                lon: gpsInfo.lon || "N/D",
+                altitud: gpsInfo.altitud || "N/D"
+            };
+
+            const imagenFinal = await estamparDatosEnImagen(imagenComprimida, datosMarca);
+
+            setFotos(prev => ({
+                ...prev,
+                [nombre]: imagenFinal
+            }));
+
+            setErrors(prev => ({
+                ...prev,
+                [`foto_${nombre}`]: ""
+            }));
         } catch (error) {
             console.error(error);
             alert("No se pudo procesar la imagen.");
         } finally {
-            input.value = "";
+            e.target.value = "";
         }
     };
 
@@ -287,6 +436,11 @@ const AppProyecto = () => {
             async (pos) => {
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
+
+                const altitud = pos.coords.altitude !== null && pos.coords.altitude !== undefined
+                    ? `${pos.coords.altitude.toFixed(1)} m`
+                    : "N/D";
+
                 let textoUbicacion = `${lat}, ${lon}`;
 
                 try {
@@ -304,15 +458,22 @@ const AppProyecto = () => {
                             "";
 
                         const departamento = data.address.state || "";
-                        const lugar = [municipio, departamento].filter(Boolean).join(", ");
 
+                        const lugar = [municipio, departamento].filter(Boolean).join(", ");
                         if (lugar) {
                             textoUbicacion = `${lugar} (${lat}, ${lon})`;
                         }
                     }
                 } catch (error) {
-                    console.error("No se pudo obtener la ubicación legible", error);
+                    console.error("No se pudo obtener el municipio", error);
                 }
+
+                setGpsInfo({
+                    lat: `${lat}`,
+                    lon: `${lon}`,
+                    altitud,
+                    direccion: textoUbicacion
+                });
 
                 setFormData(prev => ({ ...prev, ubicacion: textoUbicacion }));
                 setObteniendoGPS(false);
@@ -321,6 +482,12 @@ const AppProyecto = () => {
                 console.error("Error GPS", error);
                 alert("Asegúrate de tener el GPS encendido y en modo 'Alta Precisión'.");
                 setFormData(prev => ({ ...prev, ubicacion: "" }));
+                setGpsInfo({
+                    lat: "",
+                    lon: "",
+                    altitud: "",
+                    direccion: ""
+                });
                 setObteniendoGPS(false);
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
@@ -370,14 +537,12 @@ const AppProyecto = () => {
             body: tablaDatos
         });
 
-        const nombresFotos = PHOTO_LABELS;
-
         for (const [key, base64] of Object.entries(fotos)) {
             if (!base64) continue;
 
             doc.addPage();
             doc.setFontSize(14);
-            doc.text(`Evidencia: ${nombresFotos[key] || key}`, 15, 20);
+            doc.text(`Evidencia: ${PHOTO_LABELS[key] || key}`, 15, 20);
 
             const imgProps = doc.getImageProperties(base64);
             const pdfPageWidth = doc.internal.pageSize.getWidth();

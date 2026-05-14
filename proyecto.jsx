@@ -81,61 +81,74 @@ const EvidenciaInput = ({ titulo, nameKey, fotoValue, onFotoChange, onRemove, er
 
 
 // ==========================================
-// 1. COMPONENTE: PANEL DE ADMINISTRADOR
+// 1. COMPONENTE: PANEL DE ADMINISTRADOR (TIEMPO REAL)
 // ==========================================
 const PanelAdmin = ({ onLogout }) => {
-    const [registros, setRegistros] = useState([]);
-    const [cargando, setCargando] = useState(false);
+    const [registrosBD, setRegistrosBD] = useState([]);
+    const [registrosFiltrados, setRegistrosFiltrados] = useState([]);
+    const [cargando, setCargando] = useState(true);
     const [descargandoZip, setDescargandoZip] = useState(false);
-    const [opcionesBd, setOpcionesBd] = useState({ transportistas: [], placas: [] });
 
+    // Estados de Filtros Dinámicos
+    const [busquedaGlobal, setBusquedaGlobal] = useState("");
     const [fechaDesde, setFechaDesde] = useState("");
     const [fechaHasta, setFechaHasta] = useState("");
-    const [filtroTransportista, setFiltroTransportista] = useState("");
-    const [filtroPlaca, setFiltroPlaca] = useState("");
-    const [filtroMunicipio, setFiltroMunicipio] = useState("");
-    const [filtroDepartamento, setFiltroDepartamento] = useState("");
 
+    // Descargar todos los registros al abrir el panel
     useEffect(() => {
-        fetch("products.json").then(res => res.json()).then(data => setOpcionesBd(data)).catch(err => console.error(err));
+        const fetchDatosIniciales = async () => {
+            setCargando(true);
+            try {
+                const supabase = getSupabase();
+                // Traemos los últimos 2000 registros para mantener la memoria rápida
+                const { data, error } = await supabase.from(SUPABASE_TABLE).select('*').order('fecha', { ascending: false }).limit(2000);
+                if (error) throw error;
+                setRegistrosBD(data || []);
+                setRegistrosFiltrados(data || []);
+            } catch (error) {
+                console.error(error); alert("Error al cargar la base de datos.");
+            } finally {
+                setCargando(false);
+            }
+        };
+        fetchDatosIniciales();
     }, []);
 
-    const buscarRegistros = async (e) => {
-        e.preventDefault();
-        setCargando(true);
-        try {
-            const supabase = getSupabase();
-            let query = supabase.from(SUPABASE_TABLE).select('*');
-            
-            if (fechaDesde) query = query.gte('fecha', fechaDesde);
-            if (fechaHasta) query = query.lte('fecha', fechaHasta);
-            if (filtroTransportista) query = query.eq('transportista', filtroTransportista);
-            if (filtroPlaca) query = query.eq('placa', filtroPlaca);
-            if (filtroMunicipio) query = query.ilike('municipio', `%${filtroMunicipio}%`);
-            if (filtroDepartamento) query = query.ilike('departamento', `%${filtroDepartamento}%`);
+    // Motor de búsqueda en Tiempo Real
+    useEffect(() => {
+        let resultado = registrosBD;
 
-            query = query.order('fecha', { ascending: false });
+        // 1. Filtro por Fecha
+        if (fechaDesde) resultado = resultado.filter(r => r.fecha >= fechaDesde);
+        if (fechaHasta) resultado = resultado.filter(r => r.fecha <= fechaHasta);
 
-            const { data, error } = await query;
-            if (error) throw error;
-            setRegistros(data || []);
-        } catch (error) {
-            console.error(error); alert("Error al buscar los datos en la nube.");
-        } finally {
-            setCargando(false);
+        // 2. Filtro Global (Busca en cualquier columna)
+        if (busquedaGlobal.trim()) {
+            const termino = busquedaGlobal.toLowerCase();
+            resultado = resultado.filter(r => 
+                (r.negocio && r.negocio.toLowerCase().includes(termino)) ||
+                (r.cliente && r.cliente.toLowerCase().includes(termino)) ||
+                (r.transportista && r.transportista.toLowerCase().includes(termino)) ||
+                (r.placa && r.placa.toLowerCase().includes(termino)) ||
+                (r.municipio && r.municipio.toLowerCase().includes(termino)) ||
+                (r.departamento && r.departamento.toLowerCase().includes(termino)) ||
+                (r.codigo && r.codigo.toLowerCase().includes(termino)) ||
+                (r.telefono && r.telefono.toLowerCase().includes(termino)) ||
+                (r.contrato && r.contrato.toLowerCase().includes(termino))
+            );
         }
-    };
+
+        setRegistrosFiltrados(resultado);
+    }, [busquedaGlobal, fechaDesde, fechaHasta, registrosBD]);
 
     const limpiarFiltros = () => {
-        setFechaDesde(""); setFechaHasta(""); setFiltroTransportista("");
-        setFiltroPlaca(""); setFiltroMunicipio(""); setFiltroDepartamento("");
-        setRegistros([]);
+        setBusquedaGlobal(""); setFechaDesde(""); setFechaHasta("");
     };
 
     const descargarExcelMaestro = () => {
-        if (registros.length === 0) return alert("No hay registros para descargar.");
+        if (registrosFiltrados.length === 0) return alert("No hay registros en pantalla para descargar.");
         const wb = window.XLSX.utils.book_new();
-        const datosMaestros = registros.map(r => ({
+        const datosMaestros = registrosFiltrados.map(r => ({
             "ID Registro": r.registro_id, 
             "Fecha": formatearFechaDisplay(r.fecha), 
             "Transportista": r.transportista,
@@ -163,11 +176,11 @@ const PanelAdmin = ({ onLogout }) => {
     };
 
     const descargarZip = async () => {
-        if (registros.length === 0) return alert("No hay registros para empaquetar en ZIP.");
+        if (registrosFiltrados.length === 0) return alert("No hay registros en pantalla para empaquetar.");
         setDescargandoZip(true);
         try {
             const zip = new window.JSZip();
-            for (const reg of registros) {
+            for (const reg of registrosFiltrados) {
                 const idCorto = reg.registro_id.slice(0, 5);
                 const nombreCarpeta = `Instalacion_${reg.negocio}_${formatearFechaDisplay(reg.fecha)}_${idCorto}`.replace(/[^a-z0-9_]/gi, '_');
                 const carpetaRegistro = zip.folder(nombreCarpeta);
@@ -206,42 +219,29 @@ const PanelAdmin = ({ onLogout }) => {
 
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-8">
                 <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
-                    <h2 className="text-xs font-bold text-slate-800 uppercase tracking-widest">Filtros de Búsqueda</h2>
-                    <button type="button" onClick={limpiarFiltros} className="text-xs text-slate-400 hover:text-slate-800 transition-colors">Limpiar Filtros</button>
+                    <h2 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                        <span>🔍</span> Buscador en Tiempo Real
+                    </h2>
+                    <button type="button" onClick={limpiarFiltros} className="text-xs text-slate-400 hover:text-slate-800 transition-colors">Limpiar Búsqueda</button>
                 </div>
 
-                <form onSubmit={buscarRegistros} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div className="md:col-span-2">
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Búsqueda General</label>
+                        <input type="text" placeholder="Escribe un cliente, placa, municipio, negocio, código..." value={busquedaGlobal} onChange={e => setBusquedaGlobal(e.target.value)} className="w-full p-3 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none transition-all shadow-inner" />
+                    </div>
                     <div>
                         <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Fecha Desde</label>
-                        <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none" />
+                        <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} className="w-full p-3 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none transition-all" />
                     </div>
                     <div>
                         <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Fecha Hasta</label>
-                        <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none" />
+                        <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} className="w-full p-3 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none transition-all" />
                     </div>
-                    <div>
-                        <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Transportista</label>
-                        <select value={filtroTransportista} onChange={e => setFiltroTransportista(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none">
-                            <option value="">Todos</option>{opcionesBd.transportistas.map((t, i) => <option key={i} value={t}>{t}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Placa</label>
-                        <select value={filtroPlaca} onChange={e => setFiltroPlaca(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none">
-                            <option value="">Todas</option>{opcionesBd.placas.map((p, i) => <option key={i} value={p}>{p}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Departamento</label>
-                        <input type="text" value={filtroDepartamento} onChange={e => setFiltroDepartamento(e.target.value)} placeholder="Ej. Guatemala" className="w-full p-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none" />
-                    </div>
-                    <button type="submit" disabled={cargando} className="bg-slate-900 text-white p-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors w-full h-[42px]">
-                        {cargando ? "Buscando..." : "Buscar"}
-                    </button>
-                </form>
+                </div>
             </div>
 
-            {registros.length > 0 && (
+            {registrosFiltrados.length > 0 && !cargando && (
                 <div className="flex flex-col md:flex-row justify-end gap-3 mb-6">
                     <button onClick={descargarExcelMaestro} className="px-5 py-2.5 text-xs font-bold tracking-wider uppercase text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
                         Descargar Excel Maestro
@@ -266,14 +266,20 @@ const PanelAdmin = ({ onLogout }) => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {registros.length === 0 ? (
+                            {cargando ? (
                                 <tr>
                                     <td colSpan="6" className="p-16 text-center text-slate-400 text-sm">
-                                        No hay registros activos. Usa los filtros para comenzar.
+                                        Cargando base de datos desde la nube...
+                                    </td>
+                                </tr>
+                            ) : registrosFiltrados.length === 0 ? (
+                                <tr>
+                                    <td colSpan="6" className="p-16 text-center text-slate-400 text-sm">
+                                        No hay registros que coincidan con tu búsqueda.
                                     </td>
                                 </tr>
                             ) : (
-                                registros.map((reg) => (
+                                registrosFiltrados.map((reg) => (
                                     <tr key={reg.registro_id} className="hover:bg-slate-50/50 transition-colors text-sm text-slate-600">
                                         <td className="p-4 font-medium text-slate-900">{formatearFechaDisplay(reg.fecha)}</td>
                                         <td className="p-4">

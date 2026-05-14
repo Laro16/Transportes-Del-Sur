@@ -5,37 +5,74 @@ const SUPABASE_BUCKET = "Instalaciones";
 const SUPABASE_TABLE = "instalaciones";
 
 const INITIAL_FORM = {
-    fecha: "",
-    transportista: "",
-    placa: "",
-    negocio: "",
-    cliente: "",
-    telefono: "",
-    ubicacion: "",
-    contrato: "",
-    codigo: "",
-    serie: "",
-    modelo: "",
-    tipo: ""
+    fecha: "", transportista: "", placa: "", negocio: "", cliente: "",
+    telefono: "", ubicacion: "", contrato: "", codigo: "", serie: "", modelo: "", tipo: ""
 };
 
 const PHOTO_LABELS = {
-    fachada: "Fachada del negocio",
-    contrato: "Contrato firmado",
-    etiqueta: "Etiqueta del equipo",
-    equipo: "Equipo instalado"
+    fachada: "Fachada del negocio", contrato: "Contrato firmado",
+    etiqueta: "Etiqueta del equipo", equipo: "Equipo instalado"
 };
 
 const getSupabase = () => {
-    if (!window.supabaseClient) {
-        throw new Error("Supabase no está inicializado. Revisa supabase.js.");
-    }
+    if (!window.supabaseClient) throw new Error("Supabase no está inicializado. Revisa supabase.js.");
     return window.supabaseClient;
 };
 
+// ==========================================
+// COMPONENTES DE INTERFAZ EXTERNOS (CORRIGE LA PÉRDIDA DE FOCO)
+// ==========================================
+const InputForm = ({ label, type = "text", name, req = true, opts, value, onChange, error }) => (
+    <div className="mb-5">
+        <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">{label}</label>
+        {opts ? (
+            <select name={name} value={value} onChange={onChange} className="w-full p-3.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-800 outline-none transition-all text-slate-700" required={req}>
+                <option value="">Seleccionar...</option>{opts.map((o, i) => <option key={i} value={o}>{o}</option>)}
+            </select>
+        ) : (
+            <input type={type} name={name} value={value} onChange={onChange} className="w-full p-3.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-800 outline-none transition-all text-slate-700" required={req} />
+        )}
+        {error && <p className="text-xs text-rose-500 mt-1.5 font-medium">{error}</p>}
+    </div>
+);
+
+const EvidenciaInput = ({ titulo, nameKey, fotoValue, onFotoChange, onRemove, error }) => (
+    <div className="mb-5 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+        <label className="text-sm block font-bold mb-3 text-slate-700">{titulo}</label>
+        {!fotoValue ? (
+            <div className="flex gap-3">
+                <label className="flex-1 text-center bg-slate-50 text-slate-700 py-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 hover:border-slate-300 text-sm font-medium transition-all shadow-sm">
+                    📸 Cámara
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onFotoChange(e, nameKey)} />
+                </label>
+                <label className="flex-1 text-center bg-slate-50 text-slate-700 py-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 hover:border-slate-300 text-sm font-medium transition-all shadow-sm">
+                    🖼️ Galería
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => onFotoChange(e, nameKey)} />
+                </label>
+            </div>
+        ) : (
+            <div className="space-y-3">
+                <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+                    <img src={fotoValue} className="w-full h-48 object-cover opacity-90" alt={titulo} />
+                </div>
+                <div className="flex gap-3">
+                    <label className="flex-1 text-center bg-indigo-50 text-indigo-700 py-2.5 rounded-xl border border-indigo-200 cursor-pointer hover:bg-indigo-100 text-xs font-bold transition-colors">
+                        🔄 REPETIR
+                        <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onFotoChange(e, nameKey)} />
+                    </label>
+                    <button type="button" onClick={() => onRemove(nameKey)} className="flex-1 text-center bg-rose-50 text-rose-700 py-2.5 rounded-xl border border-rose-200 hover:bg-rose-100 text-xs font-bold transition-colors">
+                        🗑️ BORRAR
+                    </button>
+                </div>
+            </div>
+        )}
+        {error && <p className="text-xs text-rose-500 mt-2 font-medium">{error}</p>}
+    </div>
+);
+
 
 // ==========================================
-// 1. COMPONENTE: PANEL DE ADMINISTRADOR (RENOVADO)
+// 1. COMPONENTE: PANEL DE ADMINISTRADOR
 // ==========================================
 const PanelAdmin = ({ onLogout }) => {
     const [registros, setRegistros] = useState([]);
@@ -216,7 +253,7 @@ const PanelAdmin = ({ onLogout }) => {
 
 
 // ==========================================
-// 2. COMPONENTE: VISTA TECNICO (FORMULARIO ELEGANTE)
+// 2. COMPONENTE: VISTA TECNICO
 // ==========================================
 const VistaTecnico = ({ onLogout }) => {
     const skipDraftSaveRef = useRef(false);
@@ -427,58 +464,9 @@ const VistaTecnico = ({ onLogout }) => {
         } catch (e) { console.error(e); alert("Error al guardar en la nube."); } finally { setGenerando(false); }
     };
 
-    const InputForm = ({ label, type = "text", name, req = true, opts }) => (
-        <div className="mb-5">
-            <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">{label}</label>
-            {opts ? (
-                <select name={name} value={formData[name]} onChange={handleChange} className="w-full p-3.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-800 outline-none transition-all text-slate-700" required={req}>
-                    <option value="">Seleccionar...</option>{opts.map((o, i) => <option key={i} value={o}>{o}</option>)}
-                </select>
-            ) : (
-                <input type={type} name={name} value={formData[name]} onChange={handleChange} className="w-full p-3.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-800 outline-none transition-all text-slate-700" required={req} />
-            )}
-            {errors[name] && <p className="text-xs text-rose-500 mt-1.5 font-medium">{errors[name]}</p>}
-        </div>
-    );
-
-    const EvidenciaInput = ({ titulo, nameKey }) => (
-        <div className="mb-5 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-            <label className="text-sm block font-bold mb-3 text-slate-700">{titulo}</label>
-            {!fotos[nameKey] ? (
-                <div className="flex gap-3">
-                    <label className="flex-1 text-center bg-slate-50 text-slate-700 py-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 hover:border-slate-300 text-sm font-medium transition-all shadow-sm">
-                        📸 Cámara
-                        <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFoto(e, nameKey)} />
-                    </label>
-                    <label className="flex-1 text-center bg-slate-50 text-slate-700 py-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 hover:border-slate-300 text-sm font-medium transition-all shadow-sm">
-                        🖼️ Galería
-                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFoto(e, nameKey)} />
-                    </label>
-                </div>
-            ) : (
-                <div className="space-y-3">
-                    <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
-                        <img src={fotos[nameKey]} className="w-full h-48 object-cover opacity-90" alt={titulo} />
-                    </div>
-                    <div className="flex gap-3">
-                        <label className="flex-1 text-center bg-indigo-50 text-indigo-700 py-2.5 rounded-xl border border-indigo-200 cursor-pointer hover:bg-indigo-100 text-xs font-bold transition-colors">
-                            🔄 REPETIR
-                            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFoto(e, nameKey)} />
-                        </label>
-                        <button type="button" onClick={() => quitarFoto(nameKey)} className="flex-1 text-center bg-rose-50 text-rose-700 py-2.5 rounded-xl border border-rose-200 hover:bg-rose-100 text-xs font-bold transition-colors">
-                            🗑️ BORRAR
-                        </button>
-                    </div>
-                </div>
-            )}
-            {errors[`foto_${nameKey}`] && <p className="text-xs text-rose-500 mt-2 font-medium">{errors[`foto_${nameKey}`]}</p>}
-        </div>
-    );
-
     return (
         <div className="bg-slate-100 min-h-screen font-sans">
             <div id="molde-imagen-whatsapp" className="fixed top-0 left-[-9999px] bg-white p-10 w-[1200px]">
-                 {/* El molde de la foto queda igual visualmente interno */}
                 <div className="bg-slate-900 text-white p-6 text-center rounded-xl mb-8"><h2 className="text-4xl font-bold mb-2">Transportes Del Sur</h2><p className="text-xl font-light tracking-widest uppercase">Reporte de Instalación</p></div>
                 <div className="grid grid-cols-2 gap-6 mb-8 bg-slate-50 p-6 rounded-xl border-2 border-slate-200 text-xl text-slate-700">
                     <p><span className="font-bold text-slate-900">Fecha:</span> {formData.fecha}</p><p><span className="font-bold text-slate-900">Transportista:</span> {formData.transportista}</p>
@@ -506,18 +494,18 @@ const VistaTecnico = ({ onLogout }) => {
                     
                     <div>
                         <h3 className="text-sm font-bold text-slate-800 mb-4 uppercase tracking-widest flex items-center gap-2"><span className="bg-slate-200 w-6 h-6 rounded-full flex items-center justify-center text-slate-600 text-xs">1</span> Transporte</h3>
-                        <InputForm label="Fecha de Instalación" type="date" name="fecha" />
-                        <InputForm label="Transportista Asignado" name="transportista" opts={opciones.transportistas} />
-                        <InputForm label="Placa del Vehículo" name="placa" opts={opciones.placas} />
+                        <InputForm label="Fecha de Instalación" type="date" name="fecha" value={formData.fecha} onChange={handleChange} error={errors.fecha} />
+                        <InputForm label="Transportista Asignado" name="transportista" opts={opciones.transportistas} value={formData.transportista} onChange={handleChange} error={errors.transportista} />
+                        <InputForm label="Placa del Vehículo" name="placa" opts={opciones.placas} value={formData.placa} onChange={handleChange} error={errors.placa} />
                     </div>
 
                     <hr className="border-slate-100" />
 
                     <div>
                         <h3 className="text-sm font-bold text-slate-800 mb-4 uppercase tracking-widest flex items-center gap-2"><span className="bg-slate-200 w-6 h-6 rounded-full flex items-center justify-center text-slate-600 text-xs">2</span> Datos del Cliente</h3>
-                        <InputForm label="Nombre del Negocio" name="negocio" />
-                        <InputForm label="Propietario / Cliente" name="cliente" />
-                        <InputForm label="Teléfono de Contacto" type="tel" name="telefono" />
+                        <InputForm label="Nombre del Negocio" name="negocio" value={formData.negocio} onChange={handleChange} error={errors.negocio} />
+                        <InputForm label="Propietario / Cliente" name="cliente" value={formData.cliente} onChange={handleChange} error={errors.cliente} />
+                        <InputForm label="Teléfono de Contacto" type="tel" name="telefono" value={formData.telefono} onChange={handleChange} error={errors.telefono} />
                         
                         <div className="mb-5">
                             <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Ubicación GPS</label>
@@ -529,25 +517,25 @@ const VistaTecnico = ({ onLogout }) => {
                             </div>
                             {errors.ubicacion && <p className="text-xs text-rose-500 mt-1.5 font-medium">{errors.ubicacion}</p>}
                         </div>
-                        <InputForm label="Número de Contrato" name="contrato" />
+                        <InputForm label="Número de Contrato" name="contrato" value={formData.contrato} onChange={handleChange} error={errors.contrato} />
                     </div>
 
                     <hr className="border-slate-100" />
 
                     <div>
                         <h3 className="text-sm font-bold text-slate-800 mb-4 uppercase tracking-widest flex items-center gap-2"><span className="bg-slate-200 w-6 h-6 rounded-full flex items-center justify-center text-slate-600 text-xs">3</span> Especificaciones del Equipo</h3>
-                        <InputForm label="Código de Equipo" name="codigo" />
-                        <InputForm label="Número de Serie" name="serie" />
-                        <InputForm label="Modelo" name="modelo" />
-                        <InputForm label="Tipo de Cuerpo" name="tipo" opts={["1 cuerpo", "2 cuerpos", "3 cuerpos", "4 cuerpos"]} />
+                        <InputForm label="Código de Equipo" name="codigo" value={formData.codigo} onChange={handleChange} error={errors.codigo} />
+                        <InputForm label="Número de Serie" name="serie" value={formData.serie} onChange={handleChange} error={errors.serie} />
+                        <InputForm label="Modelo" name="modelo" value={formData.modelo} onChange={handleChange} error={errors.modelo} />
+                        <InputForm label="Tipo de Cuerpo" name="tipo" opts={["1 cuerpo", "2 cuerpos", "3 cuerpos", "4 cuerpos"]} value={formData.tipo} onChange={handleChange} error={errors.tipo} />
                     </div>
 
                     <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
                         <h3 className="text-sm font-bold text-slate-800 mb-4 uppercase tracking-widest flex items-center gap-2"><span className="bg-slate-800 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">4</span> Evidencias Fotográficas</h3>
-                        <EvidenciaInput titulo="Fachada Exterior" nameKey="fachada" />
-                        <EvidenciaInput titulo="Documento de Contrato" nameKey="contrato" />
-                        <EvidenciaInput titulo="Etiqueta Técnica" nameKey="etiqueta" />
-                        <EvidenciaInput titulo="Equipo Final Instalado" nameKey="equipo" />
+                        <EvidenciaInput titulo="Fachada Exterior" nameKey="fachada" fotoValue={fotos.fachada} onFotoChange={handleFoto} onRemove={quitarFoto} error={errors.foto_fachada} />
+                        <EvidenciaInput titulo="Documento de Contrato" nameKey="contrato" fotoValue={fotos.contrato} onFotoChange={handleFoto} onRemove={quitarFoto} error={errors.foto_contrato} />
+                        <EvidenciaInput titulo="Etiqueta Técnica" nameKey="etiqueta" fotoValue={fotos.etiqueta} onFotoChange={handleFoto} onRemove={quitarFoto} error={errors.foto_etiqueta} />
+                        <EvidenciaInput titulo="Equipo Final Instalado" nameKey="equipo" fotoValue={fotos.equipo} onFotoChange={handleFoto} onRemove={quitarFoto} error={errors.foto_equipo} />
                     </div>
 
                     <button type="submit" disabled={generando} className={`w-full ${generando ? "bg-slate-400" : "bg-slate-900 hover:bg-slate-800 hover:-translate-y-1"} text-white font-medium tracking-wide py-5 rounded-2xl shadow-xl transition-all text-sm uppercase`}>
@@ -562,7 +550,7 @@ const VistaTecnico = ({ onLogout }) => {
 
 
 // ==========================================
-// 3. COMPONENTE PRINCIPAL (LOGIN ELEGANTE)
+// 3. COMPONENTE PRINCIPAL (LOGIN)
 // ==========================================
 const AppProyecto = () => {
     const [isLoggedIn, setIsLoggedIn] = useState(false);

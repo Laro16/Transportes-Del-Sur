@@ -6,7 +6,8 @@ const SUPABASE_TABLE = "instalaciones";
 
 const INITIAL_FORM = {
     fecha: "", transportista: "", placa: "", negocio: "", cliente: "",
-    telefono: "", ubicacion: "", contrato: "", codigo: "", serie: "", modelo: "", tipo: ""
+    telefono: "", ubicacion: "", municipio: "", departamento: "", 
+    contrato: "", codigo: "", serie: "", modelo: "", tipo: ""
 };
 
 const PHOTO_LABELS = {
@@ -19,7 +20,6 @@ const getSupabase = () => {
     return window.supabaseClient;
 };
 
-// Función global para voltear la fecha a Día/Mes/Año en todo el sistema
 const formatearFechaDisplay = (fechaISO) => {
     if (!fechaISO) return "";
     const partes = fechaISO.split("-");
@@ -31,15 +31,15 @@ const formatearFechaDisplay = (fechaISO) => {
 // ==========================================
 // COMPONENTES DE INTERFAZ EXTERNOS
 // ==========================================
-const InputForm = ({ label, type = "text", name, req = true, opts, value, onChange, error }) => (
+const InputForm = ({ label, type = "text", name, req = true, opts, value, onChange, error, readOnly = false }) => (
     <div className="mb-5">
-        <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">{label}</label>
+        <label className="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-widest">{label}</label>
         {opts ? (
-            <select name={name} value={value} onChange={onChange} className="w-full p-3.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-800 outline-none transition-all text-slate-700" required={req}>
+            <select name={name} value={value} onChange={onChange} disabled={readOnly} className="w-full p-3.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-800 outline-none transition-all text-slate-700 text-sm disabled:opacity-70" required={req}>
                 <option value="">Seleccionar...</option>{opts.map((o, i) => <option key={i} value={o}>{o}</option>)}
             </select>
         ) : (
-            <input type={type} name={name} value={value} onChange={onChange} className="w-full p-3.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-800 outline-none transition-all text-slate-700" required={req} />
+            <input type={type} name={name} value={value} onChange={onChange} readOnly={readOnly} className="w-full p-3.5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-800 outline-none transition-all text-slate-700 text-sm readOnly:bg-slate-100 readOnly:text-slate-500 readOnly:focus:ring-0" required={req} />
         )}
         {error && <p className="text-xs text-rose-500 mt-1.5 font-medium">{error}</p>}
     </div>
@@ -51,11 +51,11 @@ const EvidenciaInput = ({ titulo, nameKey, fotoValue, onFotoChange, onRemove, er
         {!fotoValue ? (
             <div className="flex gap-3">
                 <label className="flex-1 text-center bg-slate-50 text-slate-700 py-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 hover:border-slate-300 text-sm font-medium transition-all shadow-sm">
-                    📸 Cámara
+                    Cámara
                     <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onFotoChange(e, nameKey)} />
                 </label>
                 <label className="flex-1 text-center bg-slate-50 text-slate-700 py-3 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 hover:border-slate-300 text-sm font-medium transition-all shadow-sm">
-                    🖼️ Galería
+                    Galería
                     <input type="file" accept="image/*" className="hidden" onChange={(e) => onFotoChange(e, nameKey)} />
                 </label>
             </div>
@@ -65,12 +65,12 @@ const EvidenciaInput = ({ titulo, nameKey, fotoValue, onFotoChange, onRemove, er
                     <img src={fotoValue} className="w-full h-48 object-cover opacity-90" alt={titulo} />
                 </div>
                 <div className="flex gap-3">
-                    <label className="flex-1 text-center bg-indigo-50 text-indigo-700 py-2.5 rounded-xl border border-indigo-200 cursor-pointer hover:bg-indigo-100 text-xs font-bold transition-colors">
-                        🔄 REPETIR
+                    <label className="flex-1 text-center bg-slate-800 text-white py-2.5 rounded-xl cursor-pointer hover:bg-slate-900 text-xs font-bold tracking-widest transition-colors">
+                        REPETIR
                         <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onFotoChange(e, nameKey)} />
                     </label>
-                    <button type="button" onClick={() => onRemove(nameKey)} className="flex-1 text-center bg-rose-50 text-rose-700 py-2.5 rounded-xl border border-rose-200 hover:bg-rose-100 text-xs font-bold transition-colors">
-                        🗑️ BORRAR
+                    <button type="button" onClick={() => onRemove(nameKey)} className="flex-1 text-center bg-rose-50 text-rose-700 py-2.5 rounded-xl border border-rose-200 hover:bg-rose-100 text-xs font-bold tracking-widest transition-colors">
+                        BORRAR
                     </button>
                 </div>
             </div>
@@ -85,10 +85,20 @@ const EvidenciaInput = ({ titulo, nameKey, fotoValue, onFotoChange, onRemove, er
 // ==========================================
 const PanelAdmin = ({ onLogout }) => {
     const [registros, setRegistros] = useState([]);
-    const [fechaDesde, setFechaDesde] = useState("");
-    const [fechaHasta, setFechaHasta] = useState("");
     const [cargando, setCargando] = useState(false);
     const [descargandoZip, setDescargandoZip] = useState(false);
+    const [opcionesBd, setOpcionesBd] = useState({ transportistas: [], placas: [] });
+
+    const [fechaDesde, setFechaDesde] = useState("");
+    const [fechaHasta, setFechaHasta] = useState("");
+    const [filtroTransportista, setFiltroTransportista] = useState("");
+    const [filtroPlaca, setFiltroPlaca] = useState("");
+    const [filtroMunicipio, setFiltroMunicipio] = useState("");
+    const [filtroDepartamento, setFiltroDepartamento] = useState("");
+
+    useEffect(() => {
+        fetch("products.json").then(res => res.json()).then(data => setOpcionesBd(data)).catch(err => console.error(err));
+    }, []);
 
     const buscarRegistros = async (e) => {
         e.preventDefault();
@@ -96,19 +106,30 @@ const PanelAdmin = ({ onLogout }) => {
         try {
             const supabase = getSupabase();
             let query = supabase.from(SUPABASE_TABLE).select('*');
+            
             if (fechaDesde) query = query.gte('fecha', fechaDesde);
             if (fechaHasta) query = query.lte('fecha', fechaHasta);
+            if (filtroTransportista) query = query.eq('transportista', filtroTransportista);
+            if (filtroPlaca) query = query.eq('placa', filtroPlaca);
+            if (filtroMunicipio) query = query.ilike('municipio', `%${filtroMunicipio}%`);
+            if (filtroDepartamento) query = query.ilike('departamento', `%${filtroDepartamento}%`);
+
             query = query.order('fecha', { ascending: false });
 
             const { data, error } = await query;
             if (error) throw error;
             setRegistros(data || []);
         } catch (error) {
-            console.error(error);
-            alert("Error al buscar los datos en la nube.");
+            console.error(error); alert("Error al buscar los datos en la nube.");
         } finally {
             setCargando(false);
         }
+    };
+
+    const limpiarFiltros = () => {
+        setFechaDesde(""); setFechaHasta(""); setFiltroTransportista("");
+        setFiltroPlaca(""); setFiltroMunicipio(""); setFiltroDepartamento("");
+        setRegistros([]);
     };
 
     const descargarExcelMaestro = () => {
@@ -127,16 +148,18 @@ const PanelAdmin = ({ onLogout }) => {
             "Serie Equipo": r.serie,
             "Modelo Equipo": r.modelo, 
             "Tipo Equipo": r.tipo, 
-            "Ubicación / GPS": r.ubicacion,
+            "Municipio": r.municipio,
+            "Departamento": r.departamento,
+            "GPS Exacto": r.ubicacion,
             "Latitud": r.latitud, 
             "Longitud": r.longitud, 
-            "Enlace Reporte PDF": r.pdf_url,
-            "Enlace Evidencia JPG": r.imagen_url, 
-            "Enlace Excel Individual": r.excel_url
+            "PDF": r.pdf_url,
+            "IMAGEN": r.imagen_url, 
+            "EXCEL INDIVIDUAL": r.excel_url
         }));
         const ws = window.XLSX.utils.json_to_sheet(datosMaestros);
         window.XLSX.utils.book_append_sheet(wb, ws, "Reporte Maestro");
-        window.XLSX.writeFile(wb, `Reporte_TransportesDelSur_${formatearFechaDisplay(fechaDesde) || 'Todo'}_a_${formatearFechaDisplay(fechaHasta) || 'Todo'}.xlsx`);
+        window.XLSX.writeFile(wb, `Reporte_General_${formatearFechaDisplay(fechaDesde) || 'Historico'}.xlsx`);
     };
 
     const descargarZip = async () => {
@@ -161,7 +184,7 @@ const PanelAdmin = ({ onLogout }) => {
                 await agregarArchivo(reg.excel_url, `Datos_${reg.negocio}.xlsx`);
             }
             const contenidoZip = await zip.generateAsync({ type: "blob" });
-            window.saveAs(contenidoZip, `Archivos_Completos_${formatearFechaDisplay(fechaDesde) || 'Todo'}.zip`);
+            window.saveAs(contenidoZip, `Archivos_Completos_${formatearFechaDisplay(fechaDesde) || 'Historico'}.zip`);
         } catch (error) {
             console.error(error); alert("Hubo un problema al generar el archivo ZIP.");
         } finally {
@@ -170,96 +193,109 @@ const PanelAdmin = ({ onLogout }) => {
     };
 
     return (
-        <div className="max-w-7xl mx-auto p-4 md:p-8 bg-slate-50 min-h-screen font-sans">
-            <header className="flex flex-col md:flex-row justify-between items-center bg-slate-900 text-white p-8 rounded-3xl mb-8 shadow-xl gap-4">
+        <div className="max-w-screen-2xl mx-auto p-4 md:p-8 bg-slate-50 min-h-screen font-sans">
+            <header className="flex flex-col md:flex-row justify-between items-center border-b border-slate-200 pb-6 mb-8 gap-4">
                 <div className="text-center md:text-left">
-                    <h1 className="text-3xl font-light tracking-wide mb-1">TRANSPORTES DEL SUR</h1>
-                    <p className="text-slate-400 text-sm tracking-widest uppercase">Dashboard Administrativo</p>
+                    <h1 className="text-3xl font-light tracking-tight text-slate-900 mb-1">TRANSPORTES DEL SUR</h1>
+                    <p className="text-slate-400 text-xs tracking-widest uppercase">Dashboard Administrativo</p>
                 </div>
-                <button onClick={onLogout} className="border border-slate-600 hover:bg-slate-800 text-white px-6 py-2.5 rounded-full text-sm font-medium transition-all w-full md:w-auto">
+                <button onClick={onLogout} className="text-slate-500 hover:text-slate-900 text-sm font-medium transition-colors">
                     Cerrar Sesión
                 </button>
             </header>
 
-            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200 mb-8">
-                <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-6">Filtros de Búsqueda</h2>
-                <form onSubmit={buscarRegistros} className="flex flex-wrap gap-5 items-end">
-                    <div className="flex-1 min-w-[200px]">
-                        <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Fecha Desde</label>
-                        <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-800 focus:border-transparent outline-none transition-all text-slate-700" />
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-8">
+                <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
+                    <h2 className="text-xs font-bold text-slate-800 uppercase tracking-widest">Filtros de Búsqueda</h2>
+                    <button type="button" onClick={limpiarFiltros} className="text-xs text-slate-400 hover:text-slate-800 transition-colors">Limpiar Filtros</button>
+                </div>
+
+                <form onSubmit={buscarRegistros} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
+                    <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Fecha Desde</label>
+                        <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none" />
                     </div>
-                    <div className="flex-1 min-w-[200px]">
-                        <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Fecha Hasta</label>
-                        <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-800 focus:border-transparent outline-none transition-all text-slate-700" />
+                    <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Fecha Hasta</label>
+                        <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none" />
                     </div>
-                    <button type="submit" disabled={cargando} className="bg-slate-900 text-white px-10 py-3.5 rounded-xl font-medium shadow-lg shadow-slate-900/20 hover:bg-slate-800 hover:-translate-y-0.5 w-full md:w-auto min-w-[160px] transition-all">
-                        {cargando ? "Buscando..." : "Buscar Registros"}
+                    <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Transportista</label>
+                        <select value={filtroTransportista} onChange={e => setFiltroTransportista(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none">
+                            <option value="">Todos</option>{opcionesBd.transportistas.map((t, i) => <option key={i} value={t}>{t}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Placa</label>
+                        <select value={filtroPlaca} onChange={e => setFiltroPlaca(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none">
+                            <option value="">Todas</option>{opcionesBd.placas.map((p, i) => <option key={i} value={p}>{p}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Departamento</label>
+                        <input type="text" value={filtroDepartamento} onChange={e => setFiltroDepartamento(e.target.value)} placeholder="Ej. Guatemala" className="w-full p-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none" />
+                    </div>
+                    <button type="submit" disabled={cargando} className="bg-slate-900 text-white p-2.5 rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors w-full h-[42px]">
+                        {cargando ? "Buscando..." : "Buscar"}
                     </button>
                 </form>
             </div>
 
             {registros.length > 0 && (
-                <div className="flex flex-col md:flex-row gap-5 mb-8">
-                    <button onClick={descargarExcelMaestro} className="flex-1 bg-white border border-slate-200 text-slate-700 font-medium py-3.5 px-6 rounded-xl shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex items-center justify-center gap-3">
-                        <span className="text-emerald-600 text-lg">📊</span> Excel Maestro (Todas las columnas)
+                <div className="flex flex-col md:flex-row justify-end gap-3 mb-6">
+                    <button onClick={descargarExcelMaestro} className="px-5 py-2.5 text-xs font-bold tracking-wider uppercase text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
+                        Descargar Excel Maestro
                     </button>
-                    <button onClick={descargarZip} disabled={descargandoZip} className={`flex-1 bg-white border border-slate-200 text-slate-700 font-medium py-3.5 px-6 rounded-xl shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex items-center justify-center gap-3 ${descargandoZip ? 'opacity-60 cursor-not-allowed' : ''}`}>
-                        <span className="text-indigo-600 text-lg">📦</span> {descargandoZip ? "Empaquetando ZIP..." : "Descargar Todo en ZIP"}
+                    <button onClick={descargarZip} disabled={descargandoZip} className={`px-5 py-2.5 text-xs font-bold tracking-wider uppercase bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors ${descargandoZip ? 'opacity-50' : ''}`}>
+                        {descargandoZip ? "Procesando ZIP..." : "Descargar Archivos ZIP"}
                     </button>
                 </div>
             )}
 
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[1200px]">
+                    <table className="w-full text-left border-collapse min-w-[1300px]">
                         <thead>
-                            <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b-2 border-slate-200">
-                                <th className="p-5 font-semibold">Fecha</th>
-                                <th className="p-5 font-semibold">Negocio / Cliente</th>
-                                <th className="p-5 font-semibold">Contacto</th>
-                                <th className="p-5 font-semibold">Transportista (Placa)</th>
-                                <th className="p-5 font-semibold">Equipo Instalado</th>
-                                <th className="p-5 font-semibold">Ubicación GPS</th>
-                                <th className="p-5 font-semibold text-center">Archivos</th>
+                            <tr className="bg-slate-50 text-slate-400 text-[10px] uppercase tracking-widest border-b border-slate-200">
+                                <th className="p-4 font-semibold">Fecha</th>
+                                <th className="p-4 font-semibold">Negocio / Cliente</th>
+                                <th className="p-4 font-semibold">Transportista (Placa)</th>
+                                <th className="p-4 font-semibold">Eq. Código / Detalle</th>
+                                <th className="p-4 font-semibold">Depto / Municipio</th>
+                                <th className="p-4 font-semibold text-center">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-200">
+                        <tbody className="divide-y divide-slate-100">
                             {registros.length === 0 ? (
                                 <tr>
-                                    <td colSpan="7" className="p-16 text-center text-slate-400">
-                                        <p className="text-lg mb-1">Sin resultados</p>
-                                        <p className="text-sm font-light">Usa el filtro superior para mostrar las instalaciones.</p>
+                                    <td colSpan="6" className="p-16 text-center text-slate-400 text-sm">
+                                        No hay registros activos. Usa los filtros para comenzar.
                                     </td>
                                 </tr>
                             ) : (
                                 registros.map((reg) => (
-                                    <tr key={reg.registro_id} className="hover:bg-slate-50/70 transition-colors text-sm text-slate-600">
-                                        <td className="p-5 font-medium text-slate-900">{formatearFechaDisplay(reg.fecha)}</td>
-                                        <td className="p-5">
+                                    <tr key={reg.registro_id} className="hover:bg-slate-50/50 transition-colors text-sm text-slate-600">
+                                        <td className="p-4 font-medium text-slate-900">{formatearFechaDisplay(reg.fecha)}</td>
+                                        <td className="p-4">
                                             <p className="font-semibold text-slate-900">{reg.negocio}</p>
-                                            <p className="text-xs text-slate-500 mt-0.5">{reg.cliente}</p>
+                                            <p className="text-xs text-slate-500 mt-0.5">{reg.cliente} <span className="text-slate-300 mx-1">|</span> {reg.telefono}</p>
                                         </td>
-                                        <td className="p-5">
-                                            <p>{reg.telefono}</p>
-                                            <p className="text-xs text-slate-400 mt-0.5">Contrato: {reg.contrato}</p>
+                                        <td className="p-4">
+                                            <p className="font-medium text-slate-800">{reg.transportista}</p>
+                                            <p className="text-xs text-slate-500 mt-0.5">{reg.placa}</p>
                                         </td>
-                                        <td className="p-5">
-                                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 mb-1 border border-slate-200">
-                                                {reg.transportista}
-                                            </span>
-                                            <p className="text-xs text-slate-500 mt-1">{reg.placa}</p>
+                                        <td className="p-4">
+                                            <p className="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 inline-block mb-1">{reg.codigo}</p>
+                                            <p className="text-xs text-slate-500">{reg.modelo} ({reg.tipo})</p>
                                         </td>
-                                        <td className="p-5">
-                                            <p className="font-medium text-slate-800">{reg.modelo}</p>
-                                            <p className="text-xs text-slate-500 mt-0.5">{reg.tipo}</p>
+                                        <td className="p-4">
+                                            <p className="font-medium text-slate-800">{reg.departamento || "N/A"}</p>
+                                            <p className="text-xs text-slate-500 mt-0.5">{reg.municipio || "N/A"}</p>
                                         </td>
-                                        <td className="p-5 text-xs text-slate-500 max-w-[200px] truncate" title={reg.ubicacion}>
-                                            {reg.ubicacion}
-                                        </td>
-                                        <td className="p-5 flex justify-center gap-2">
-                                            {reg.pdf_url ? <a href={reg.pdf_url} target="_blank" rel="noreferrer" className="text-rose-600 bg-rose-50 border border-rose-100 hover:bg-rose-100 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shadow-sm">PDF</a> : <span className="text-slate-200 text-xs px-3 py-1.5">-</span>}
-                                            {reg.excel_url ? <a href={reg.excel_url} target="_blank" rel="noreferrer" className="text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shadow-sm">XLS</a> : <span className="text-slate-200 text-xs px-3 py-1.5">-</span>}
-                                            {reg.imagen_url ? <a href={reg.imagen_url} target="_blank" rel="noreferrer" className="text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shadow-sm">IMG</a> : <span className="text-slate-200 text-xs px-3 py-1.5">-</span>}
+                                        <td className="p-4 flex justify-center gap-2">
+                                            {reg.pdf_url ? <a href={reg.pdf_url} target="_blank" rel="noreferrer" className="text-slate-500 border border-slate-200 hover:text-slate-900 hover:bg-slate-100 px-3 py-1.5 rounded-md text-[10px] font-bold tracking-widest uppercase transition-all">PDF</a> : null}
+                                            {reg.excel_url ? <a href={reg.excel_url} target="_blank" rel="noreferrer" className="text-slate-500 border border-slate-200 hover:text-slate-900 hover:bg-slate-100 px-3 py-1.5 rounded-md text-[10px] font-bold tracking-widest uppercase transition-all">XLS</a> : null}
+                                            {reg.imagen_url ? <a href={reg.imagen_url} target="_blank" rel="noreferrer" className="text-slate-500 border border-slate-200 hover:text-slate-900 hover:bg-slate-100 px-3 py-1.5 rounded-md text-[10px] font-bold tracking-widest uppercase transition-all">IMG</a> : null}
                                         </td>
                                     </tr>
                                 ))
@@ -374,7 +410,7 @@ const VistaTecnico = ({ onLogout }) => {
                 ctx.font = `bold ${fontSize}px Arial`; ctx.textBaseline = "top"; ctx.textAlign = "right";
                 ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = "rgba(0,0,0,0.75)"; ctx.lineWidth = Math.max(2, Math.round(fontSize * 0.15));
                 ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 4; ctx.shadowOffsetX = 1; ctx.shadowOffsetY = 1;
-                const rows = [`NEGOCIO: ${datos.negocio}`, `FECHA: ${datos.fecha}`, `HORA: ${datos.hora}`, `DIRECCIÓN: ${datos.direccion}`, `GPS: ${datos.lat}, ${datos.lon}`].map(row => fitTextSingleLine(ctx, row, Math.round(canvas.width * 0.55)));
+                const rows = [`NEGOCIO: ${datos.negocio}`, `FECHA: ${datos.fecha}`, `HORA: ${datos.hora}`, `MUNICIPIO: ${datos.municipio}`, `DEPTO: ${datos.departamento}`, `GPS: ${datos.lat}, ${datos.lon}`].map(row => fitTextSingleLine(ctx, row, Math.round(canvas.width * 0.55)));
                 let y = canvas.height - margin - (rows.length * lineHeight); const x = canvas.width - margin;
                 rows.forEach((linea) => { ctx.strokeText(linea, x, y); ctx.fillText(linea, x, y); y += lineHeight; });
                 resolve(canvas.toDataURL("image/jpeg", 0.88));
@@ -393,7 +429,8 @@ const VistaTecnico = ({ onLogout }) => {
                 negocio: formData.negocio?.trim() || "NEGOCIO", 
                 fecha: formatearFechaDisplay(formData.fecha) || "Sin Fecha", 
                 hora, 
-                direccion: (!cand || /obteniendo/i.test(String(cand))) ? "SIN UBICACIÓN" : cand, 
+                municipio: formData.municipio || "N/A",
+                departamento: formData.departamento || "N/A",
                 lat: gpsInfo.lat || "N/D", 
                 lon: gpsInfo.lon || "N/D" 
             });
@@ -407,21 +444,33 @@ const VistaTecnico = ({ onLogout }) => {
     const obtenerUbicacion = (e) => {
         e.preventDefault();
         if (!navigator.geolocation) return alert("Tu dispositivo no soporta GPS.");
-        setObteniendoGPS(true); setFormData(prev => ({ ...prev, ubicacion: "Obteniendo datos satelitales..." })); setErrors(prev => ({ ...prev, ubicacion: "" }));
+        setObteniendoGPS(true); 
+        setFormData(prev => ({ ...prev, ubicacion: "Obteniendo datos satelitales...", municipio: "", departamento: "" })); 
+        setErrors(prev => ({ ...prev, ubicacion: "" }));
+        
         navigator.geolocation.getCurrentPosition(
             async (pos) => {
-                const lat = pos.coords.latitude; const lon = pos.coords.longitude; let texto = `${lat}, ${lon}`;
+                const lat = pos.coords.latitude; const lon = pos.coords.longitude; 
+                let texto = `${lat}, ${lon}`;
+                let muni = "";
+                let depto = "";
+                
                 try {
                     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
                     const data = await res.json();
                     if (data?.address) {
-                        const lugar = [data.address.city || data.address.town || data.address.village || "", data.address.state || ""].filter(Boolean).join(", ");
+                        muni = data.address.city || data.address.town || data.address.village || "";
+                        depto = data.address.state || "";
+                        const lugar = [muni, depto].filter(Boolean).join(", ");
                         if (lugar) texto = `${lugar} (${lat}, ${lon})`;
                     }
                 } catch (e) {}
-                setGpsInfo({ lat: `${lat}`, lon: `${lon}`, direccion: texto }); setFormData(prev => ({ ...prev, ubicacion: texto })); setObteniendoGPS(false);
+                
+                setGpsInfo({ lat: `${lat}`, lon: `${lon}`, direccion: texto }); 
+                setFormData(prev => ({ ...prev, ubicacion: texto, municipio: muni, departamento: depto })); 
+                setObteniendoGPS(false);
             },
-            () => { alert("Activa el GPS en modo Alta Precisión."); setFormData(prev => ({ ...prev, ubicacion: "" })); setGpsInfo({ lat: "", lon: "", direccion: "" }); setObteniendoGPS(false); },
+            () => { alert("Activa el GPS en modo Alta Precisión."); setFormData(prev => ({ ...prev, ubicacion: "", municipio: "", departamento: "" })); setGpsInfo({ lat: "", lon: "", direccion: "" }); setObteniendoGPS(false); },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
     };
@@ -451,7 +500,6 @@ const VistaTecnico = ({ onLogout }) => {
 
             const doc = new window.jspdf.jsPDF(); doc.setFontSize(18); doc.text("Reporte de Instalación", 15, 20); doc.setFontSize(12);
             
-            // Voltear la fecha en el PDF 
             const dataParaPDF = Object.entries(formData).map(([k, v]) => [k.toUpperCase(), k === 'fecha' ? formatearFechaDisplay(v) : String(v || "")]);
             doc.autoTable({ startY: 30, head: [["Campo", "Información"]], body: dataParaPDF });
             
@@ -465,15 +513,10 @@ const VistaTecnico = ({ onLogout }) => {
             const pdfBlob = doc.output("blob");
 
             const wb = window.XLSX.utils.book_new();
-            
-            // Voltear la fecha en el Excel individual
             const registroParaExcel = { ...formData, fecha: formatearFechaDisplay(formData.fecha) };
             window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet([registroParaExcel]), "Registro");
             window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(Object.entries(PHOTO_LABELS).map(([k, l]) => ({ Evidencia: l, Estado: fotos[k] ? "Adjunta" : "Pendiente" }))), "Evidencias");
             const xlsxBlob = new Blob([window.XLSX.write(wb, { bookType: "xlsx", type: "array" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-
-            const dl = (b, n) => { const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = n; a.click(); URL.revokeObjectURL(u); };
-            dl(imageBlob, iName); dl(pdfBlob, pName); dl(xlsxBlob, xName);
 
             const [p, x, i] = await Promise.all([
                 uploadBlobToSupabase(pdfBlob, `Pdfs/${pName}`, "application/pdf"),
@@ -485,7 +528,9 @@ const VistaTecnico = ({ onLogout }) => {
                 registro_id: regId, fecha: formData.fecha, negocio: formData.negocio, cliente: formData.cliente,
                 transportista: formData.transportista, placa: formData.placa, contrato: formData.contrato,
                 codigo: formData.codigo, serie: formData.serie, modelo: formData.modelo, tipo: formData.tipo,
-                telefono: formData.telefono, ubicacion: formData.ubicacion, latitud: gpsInfo.lat, longitud: gpsInfo.lon,
+                telefono: formData.telefono, ubicacion: formData.ubicacion, 
+                municipio: formData.municipio, departamento: formData.departamento,
+                latitud: gpsInfo.lat, longitud: gpsInfo.lon,
                 pdf_url: p.publicUrl, excel_url: x.publicUrl, imagen_url: i.publicUrl, pdf_path: p.path, excel_path: x.path, imagen_path: i.path
             }]);
             if (insErr) throw insErr;
@@ -504,7 +549,8 @@ const VistaTecnico = ({ onLogout }) => {
                     <p><span className="font-bold text-slate-900">Fecha:</span> {formatearFechaDisplay(formData.fecha)}</p><p><span className="font-bold text-slate-900">Transportista:</span> {formData.transportista}</p>
                     <p><span className="font-bold text-slate-900">Placa:</span> {formData.placa}</p><p><span className="font-bold text-slate-900">Negocio:</span> {formData.negocio}</p>
                     <p><span className="font-bold text-slate-900">Cliente:</span> {formData.cliente}</p><p><span className="font-bold text-slate-900">Teléfono:</span> {formData.telefono}</p>
-                    <p className="col-span-2"><span className="font-bold text-slate-900">Ubicación:</span> {formData.ubicacion}</p>
+                    <p><span className="font-bold text-slate-900">Municipio:</span> {formData.municipio || "N/A"}</p><p><span className="font-bold text-slate-900">Depto:</span> {formData.departamento || "N/A"}</p>
+                    <p className="col-span-2"><span className="font-bold text-slate-900">GPS Exacto:</span> {formData.ubicacion}</p>
                     <p><span className="font-bold text-slate-900">Contrato:</span> {formData.contrato}</p><p><span className="font-bold text-slate-900">Código Eq:</span> {formData.codigo}</p>
                     <p><span className="font-bold text-slate-900">Serie Eq:</span> {formData.serie}</p><p><span className="font-bold text-slate-900">Modelo Eq:</span> {formData.modelo} ({formData.tipo})</p>
                 </div>
@@ -541,12 +587,16 @@ const VistaTecnico = ({ onLogout }) => {
                         
                         <div className="mb-5">
                             <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Ubicación GPS</label>
-                            <div className="flex gap-2">
-                                <textarea name="ubicacion" value={formData.ubicacion} readOnly className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-sm h-14 resize-none text-slate-600 focus:outline-none" required></textarea>
-                                <button type="button" onClick={obtenerUbicacion} disabled={obteniendoGPS} className={`${obteniendoGPS ? "bg-slate-300" : "bg-slate-800 hover:bg-slate-900"} text-white px-5 rounded-xl shadow-md transition-colors flex items-center justify-center`}>
-                                    📍
+                            <div className="flex gap-2 mb-2">
+                                <button type="button" onClick={obtenerUbicacion} disabled={obteniendoGPS} className={`w-full py-3 text-sm font-bold tracking-widest uppercase rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2 ${obteniendoGPS ? "bg-slate-200 text-slate-400" : "bg-slate-800 text-white hover:bg-slate-900"}`}>
+                                    📍 Obtener Ubicación Actual
                                 </button>
                             </div>
+                            <div className="grid grid-cols-2 gap-3 mb-3">
+                                <InputForm label="Municipio" name="municipio" value={formData.municipio} onChange={handleChange} readOnly={true} req={false} />
+                                <InputForm label="Departamento" name="departamento" value={formData.departamento} onChange={handleChange} readOnly={true} req={false} />
+                            </div>
+                            <textarea name="ubicacion" value={formData.ubicacion} readOnly placeholder="Coordenadas exactas..." className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-xs h-14 resize-none text-slate-500 focus:outline-none"></textarea>
                             {errors.ubicacion && <p className="text-xs text-rose-500 mt-1.5 font-medium">{errors.ubicacion}</p>}
                         </div>
                         <InputForm label="Número de Contrato" name="contrato" value={formData.contrato} onChange={handleChange} error={errors.contrato} />
@@ -570,7 +620,7 @@ const VistaTecnico = ({ onLogout }) => {
                         <EvidenciaInput titulo="Equipo Final Instalado" nameKey="equipo" fotoValue={fotos.equipo} onFotoChange={handleFoto} onRemove={quitarFoto} error={errors.foto_equipo} />
                     </div>
 
-                    <button type="submit" disabled={generando} className={`w-full ${generando ? "bg-slate-400" : "bg-slate-900 hover:bg-slate-800 hover:-translate-y-1"} text-white font-medium tracking-wide py-5 rounded-2xl shadow-xl transition-all text-sm uppercase`}>
+                    <button type="submit" disabled={generando} className={`w-full ${generando ? "bg-slate-400" : "bg-slate-900 hover:bg-slate-800 hover:-translate-y-1"} text-white font-bold tracking-widest py-5 rounded-2xl shadow-xl transition-all text-sm uppercase`}>
                         {generando ? "Procesando Archivos..." : "Generar y Subir Reportes"}
                     </button>
                     <p className="text-center text-slate-400 text-xs mt-4 pb-6">Los datos se sincronizan automáticamente.</p>
@@ -622,11 +672,11 @@ const AppProyecto = () => {
                     <form onSubmit={handleLogin} className="space-y-6">
                         <div>
                             <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Usuario</label>
-                            <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="w-full p-4 border border-slate-200 rounded-2xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-800 focus:border-transparent outline-none transition-all text-slate-800" required />
+                            <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="w-full p-4 border border-slate-200 rounded-2xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-800 outline-none transition-all text-slate-800" required />
                         </div>
                         <div>
                             <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Contraseña</label>
-                            <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 border border-slate-200 rounded-2xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-800 focus:border-transparent outline-none transition-all text-slate-800" required />
+                            <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 border border-slate-200 rounded-2xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-800 outline-none transition-all text-slate-800" required />
                         </div>
                         <div className="pt-4">
                             <button type="submit" className="w-full bg-slate-900 text-white font-medium tracking-wide py-4 rounded-2xl hover:bg-slate-800 hover:-translate-y-1 transition-all shadow-xl shadow-slate-900/20">

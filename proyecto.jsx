@@ -5,13 +5,12 @@ const SUPABASE_BUCKET = "Instalaciones";
 const SUPABASE_TABLE = "instalaciones";
 
 const INITIAL_FORM = {
-    tipo_movimiento: "Instalación", // Nuevo campo clave
+    tipo_movimiento: "Instalación",
     fecha: "", transportista: "", placa: "", negocio: "", cliente: "",
     telefono: "", ubicacion: "", municipio: "", departamento: "", 
     contrato: "", codigo: "", serie: "", modelo: "", tipo: ""
 };
 
-// Función dinámica para saber qué fotos pedir
 const getPhotoLabels = (tipoMovimiento) => {
     if (tipoMovimiento === "Retiro") {
         return {
@@ -95,7 +94,7 @@ const EvidenciaInput = ({ titulo, nameKey, fotoValue, onFotoChange, onRemove, er
 
 
 // ==========================================
-// 1. COMPONENTE: PANEL DE ADMINISTRADOR
+// 1. COMPONENTE: PANEL DE ADMINISTRADOR 
 // ==========================================
 const PanelAdmin = ({ onLogout }) => {
     const [registrosBD, setRegistrosBD] = useState([]);
@@ -103,9 +102,11 @@ const PanelAdmin = ({ onLogout }) => {
     const [cargando, setCargando] = useState(true);
     const [descargandoZip, setDescargandoZip] = useState(false);
 
+    // Estados de Búsqueda
     const [busquedaGlobal, setBusquedaGlobal] = useState("");
     const [fechaDesde, setFechaDesde] = useState("");
     const [fechaHasta, setFechaHasta] = useState("");
+    const [vistaActiva, setVistaActiva] = useState("Todas"); // "Todas", "Instalación", "Retiro"
 
     const cargarRecientes = async () => {
         setCargando(true);
@@ -139,14 +140,25 @@ const PanelAdmin = ({ onLogout }) => {
             if (error) throw error;
             setRegistrosBD(data || []);
         } catch (error) {
-            console.error(error); alert("Error al buscar en la nube.");
+            console.error(error); alert("Error al buscar en el archivo histórico de la nube.");
         } finally {
             setCargando(false);
         }
     };
 
+    // MOTOR RELÁMPAGO (Filtro por Switch y Texto)
     useEffect(() => {
         let resultado = registrosBD;
+
+        // 1. Filtro del Switch (Instalación vs Retiro)
+        if (vistaActiva !== "Todas") {
+            resultado = resultado.filter(r => {
+                const tipo = r.tipo_movimiento || "Instalación"; // Fallback por si hay registros viejos sin columna
+                return tipo === vistaActiva;
+            });
+        }
+
+        // 2. Filtro Global de Texto
         if (busquedaGlobal.trim()) {
             const termino = busquedaGlobal.toLowerCase();
             resultado = resultado.filter(r => 
@@ -158,20 +170,20 @@ const PanelAdmin = ({ onLogout }) => {
                 (r.departamento && r.departamento.toLowerCase().includes(termino)) ||
                 (r.codigo && r.codigo.toLowerCase().includes(termino)) ||
                 (r.telefono && r.telefono.toLowerCase().includes(termino)) ||
-                (r.contrato && r.contrato.toLowerCase().includes(termino)) ||
-                (r.tipo_movimiento && r.tipo_movimiento.toLowerCase().includes(termino))
+                (r.contrato && r.contrato.toLowerCase().includes(termino))
             );
         }
+
         setRegistrosFiltrados(resultado);
-    }, [busquedaGlobal, registrosBD]);
+    }, [busquedaGlobal, registrosBD, vistaActiva]);
 
     const limpiarTodo = () => {
-        setBusquedaGlobal(""); setFechaDesde(""); setFechaHasta("");
+        setBusquedaGlobal(""); setFechaDesde(""); setFechaHasta(""); setVistaActiva("Todas");
         cargarRecientes();
     };
 
     const descargarExcelMaestro = () => {
-        if (registrosFiltrados.length === 0) return alert("No hay registros en pantalla.");
+        if (registrosFiltrados.length === 0) return alert("No hay registros en pantalla para descargar.");
         const wb = window.XLSX.utils.book_new();
         const datosMaestros = registrosFiltrados.map(r => ({
             "ID Registro": r.registro_id, 
@@ -198,11 +210,14 @@ const PanelAdmin = ({ onLogout }) => {
         }));
         const ws = window.XLSX.utils.json_to_sheet(datosMaestros);
         window.XLSX.utils.book_append_sheet(wb, ws, "Reporte Maestro");
-        window.XLSX.writeFile(wb, `Reporte_General_${formatearFechaDisplay(fechaDesde) || 'Historico'}.xlsx`);
+        
+        // Nombrar el archivo según el switch activo
+        const sufijoTipo = vistaActiva === "Todas" ? "General" : vistaActiva;
+        window.XLSX.writeFile(wb, `Reporte_${sufijoTipo}_${formatearFechaDisplay(fechaDesde) || 'Historico'}.xlsx`);
     };
 
     const descargarZip = async () => {
-        if (registrosFiltrados.length === 0) return alert("No hay registros para empaquetar.");
+        if (registrosFiltrados.length === 0) return alert("No hay registros en pantalla para empaquetar.");
         setDescargandoZip(true);
         try {
             const zip = new window.JSZip();
@@ -225,7 +240,8 @@ const PanelAdmin = ({ onLogout }) => {
                 await agregarArchivo(reg.excel_url, `Datos_${tipo}.xlsx`);
             }
             const contenidoZip = await zip.generateAsync({ type: "blob" });
-            window.saveAs(contenidoZip, `Archivos_Completos_${formatearFechaDisplay(fechaDesde) || 'Historico'}.zip`);
+            const sufijoTipo = vistaActiva === "Todas" ? "Completos" : vistaActiva;
+            window.saveAs(contenidoZip, `Archivos_ZIP_${sufijoTipo}_${formatearFechaDisplay(fechaDesde) || 'Historico'}.zip`);
         } catch (error) {
             console.error(error); alert("Hubo un problema al generar el archivo ZIP.");
         } finally {
@@ -255,25 +271,40 @@ const PanelAdmin = ({ onLogout }) => {
                     </button>
                 </div>
 
+                {/* SWITCH DINÁMICO DE VISTAS */}
+                <div className="flex justify-center md:justify-start mb-6">
+                    <div className="bg-slate-100 p-1.5 rounded-xl inline-flex gap-1 shadow-inner overflow-x-auto">
+                        <button type="button" onClick={() => setVistaActiva("Todas")} className={`px-6 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${vistaActiva === 'Todas' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                            Todas las Operaciones
+                        </button>
+                        <button type="button" onClick={() => setVistaActiva("Instalación")} className={`px-6 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${vistaActiva === 'Instalación' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>
+                            Solo Instalaciones
+                        </button>
+                        <button type="button" onClick={() => setVistaActiva("Retiro")} className={`px-6 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${vistaActiva === 'Retiro' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>
+                            Solo Retiros
+                        </button>
+                    </div>
+                </div>
+
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <div>
                         <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">1. Filtro Rápido en Pantalla</label>
-                        <input type="text" placeholder="Instalación, Retiro, Cliente, Placa, Municipio..." value={busquedaGlobal} onChange={e => setBusquedaGlobal(e.target.value)} className="w-full p-3.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-slate-800 outline-none transition-all shadow-inner bg-slate-50" />
+                        <input type="text" placeholder="Busca por Cliente, Placa, Municipio..." value={busquedaGlobal} onChange={e => setBusquedaGlobal(e.target.value)} className="w-full p-3.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-slate-800 outline-none transition-all shadow-inner bg-slate-50" />
                         <p className="text-[10px] text-slate-400 mt-2">Filtra instantáneamente sobre los resultados cargados abajo.</p>
                     </div>
 
                     <form onSubmit={buscarEnNube} className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider text-indigo-600">2. Descarga Histórica desde la Nube</label>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider text-slate-700">2. Descarga Histórica desde la Nube</label>
                         <div className="flex flex-col sm:flex-row gap-3 items-end">
                             <div className="flex-1 w-full">
                                 <label className="block text-[9px] font-semibold text-slate-500 mb-1 uppercase tracking-wider">Fecha Desde</label>
-                                <input type="date" required value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-indigo-600 outline-none bg-white" />
+                                <input type="date" required value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none bg-white" />
                             </div>
                             <div className="flex-1 w-full">
                                 <label className="block text-[9px] font-semibold text-slate-500 mb-1 uppercase tracking-wider">Fecha Hasta</label>
-                                <input type="date" required value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-indigo-600 outline-none bg-white" />
+                                <input type="date" required value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none bg-white" />
                             </div>
-                            <button type="submit" disabled={cargando} className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-xs font-bold tracking-widest uppercase hover:bg-indigo-700 transition-colors shadow-md w-full sm:w-auto h-[42px] whitespace-nowrap">
+                            <button type="submit" disabled={cargando} className="bg-slate-800 text-white px-6 py-2.5 rounded-lg text-xs font-bold tracking-widest uppercase hover:bg-slate-900 transition-colors shadow-md w-full sm:w-auto h-[42px] whitespace-nowrap">
                                 {cargando ? "Extrayendo..." : "Buscar Rango"}
                             </button>
                         </div>
@@ -283,11 +314,11 @@ const PanelAdmin = ({ onLogout }) => {
 
             {registrosFiltrados.length > 0 && !cargando && (
                 <div className="flex flex-col md:flex-row justify-end gap-3 mb-6">
-                    <button onClick={descargarExcelMaestro} className="px-5 py-2.5 text-xs font-bold tracking-wider uppercase text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm">
-                        Descargar Excel Maestro
+                    <button onClick={descargarExcelMaestro} className="px-5 py-2.5 text-xs font-bold tracking-wider uppercase text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm flex items-center justify-center gap-2">
+                        <span>📊</span> Descargar Excel ({vistaActiva})
                     </button>
-                    <button onClick={descargarZip} disabled={descargandoZip} className={`px-5 py-2.5 text-xs font-bold tracking-wider uppercase bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all shadow-sm ${descargandoZip ? 'opacity-50' : ''}`}>
-                        {descargandoZip ? "Procesando ZIP..." : "Descargar Archivos ZIP"}
+                    <button onClick={descargarZip} disabled={descargandoZip} className={`px-5 py-2.5 text-xs font-bold tracking-wider uppercase bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all shadow-sm flex items-center justify-center gap-2 ${descargandoZip ? 'opacity-50' : ''}`}>
+                        <span>📦</span> {descargandoZip ? "Procesando ZIP..." : `Descargar ZIP (${vistaActiva})`}
                     </button>
                 </div>
             )}
@@ -309,39 +340,42 @@ const PanelAdmin = ({ onLogout }) => {
                             {cargando ? (
                                 <tr><td colSpan="6" className="p-16 text-center text-slate-500 text-sm font-medium"><div className="animate-pulse">Sincronizando con la nube de Transportes Del Sur...</div></td></tr>
                             ) : registrosFiltrados.length === 0 ? (
-                                <tr><td colSpan="6" className="p-16 text-center text-slate-400 text-sm">No hay registros que coincidan con tu búsqueda.</td></tr>
+                                <tr><td colSpan="6" className="p-16 text-center text-slate-400 text-sm">No hay registros en esta vista.</td></tr>
                             ) : (
-                                registrosFiltrados.map((reg) => (
-                                    <tr key={reg.registro_id} className="hover:bg-slate-50/50 transition-colors text-sm text-slate-600">
-                                        <td className="p-4">
-                                            <p className="font-medium text-slate-900 mb-1">{formatearFechaDisplay(reg.fecha)}</p>
-                                            <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-md border ${reg.tipo_movimiento === 'Retiro' ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-indigo-50 text-indigo-600 border-indigo-200'}`}>
-                                                {reg.tipo_movimiento || "Instalación"}
-                                            </span>
-                                        </td>
-                                        <td className="p-4">
-                                            <p className="font-semibold text-slate-900">{reg.negocio}</p>
-                                            <p className="text-xs text-slate-500 mt-0.5">{reg.cliente} <span className="text-slate-300 mx-1">|</span> {reg.telefono}</p>
-                                        </td>
-                                        <td className="p-4">
-                                            <p className="font-medium text-slate-800">{reg.transportista}</p>
-                                            <p className="text-xs text-slate-500 mt-0.5">{reg.placa}</p>
-                                        </td>
-                                        <td className="p-4">
-                                            <p className="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 inline-block mb-1">{reg.codigo}</p>
-                                            <p className="text-xs text-slate-500">{reg.modelo} ({reg.tipo})</p>
-                                        </td>
-                                        <td className="p-4">
-                                            <p className="font-medium text-slate-800">{reg.departamento || "N/A"}</p>
-                                            <p className="text-xs text-slate-500 mt-0.5">{reg.municipio || "N/A"}</p>
-                                        </td>
-                                        <td className="p-4 flex justify-center gap-2">
-                                            {reg.pdf_url ? <a href={reg.pdf_url} target="_blank" rel="noreferrer" className="text-slate-500 border border-slate-200 hover:text-slate-900 hover:bg-slate-100 px-3 py-1.5 rounded-md text-[10px] font-bold tracking-widest uppercase transition-all">PDF</a> : null}
-                                            {reg.excel_url ? <a href={reg.excel_url} target="_blank" rel="noreferrer" className="text-slate-500 border border-slate-200 hover:text-slate-900 hover:bg-slate-100 px-3 py-1.5 rounded-md text-[10px] font-bold tracking-widest uppercase transition-all">XLS</a> : null}
-                                            {reg.imagen_url ? <a href={reg.imagen_url} target="_blank" rel="noreferrer" className="text-slate-500 border border-slate-200 hover:text-slate-900 hover:bg-slate-100 px-3 py-1.5 rounded-md text-[10px] font-bold tracking-widest uppercase transition-all">IMG</a> : null}
-                                        </td>
-                                    </tr>
-                                ))
+                                registrosFiltrados.map((reg) => {
+                                    const tipoMov = reg.tipo_movimiento || "Instalación";
+                                    return (
+                                        <tr key={reg.registro_id} className="hover:bg-slate-50/50 transition-colors text-sm text-slate-600">
+                                            <td className="p-4">
+                                                <p className="font-medium text-slate-900 mb-1">{formatearFechaDisplay(reg.fecha)}</p>
+                                                <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border ${tipoMov === 'Retiro' ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-indigo-50 text-indigo-600 border-indigo-200'}`}>
+                                                    {tipoMov}
+                                                </span>
+                                            </td>
+                                            <td className="p-4">
+                                                <p className="font-semibold text-slate-900">{reg.negocio}</p>
+                                                <p className="text-xs text-slate-500 mt-0.5">{reg.cliente} <span className="text-slate-300 mx-1">|</span> {reg.telefono}</p>
+                                            </td>
+                                            <td className="p-4">
+                                                <p className="font-medium text-slate-800">{reg.transportista}</p>
+                                                <p className="text-xs text-slate-500 mt-0.5">{reg.placa}</p>
+                                            </td>
+                                            <td className="p-4">
+                                                <p className="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 inline-block mb-1">{reg.codigo}</p>
+                                                <p className="text-xs text-slate-500">{reg.modelo} ({reg.tipo})</p>
+                                            </td>
+                                            <td className="p-4">
+                                                <p className="font-medium text-slate-800">{reg.departamento || "N/A"}</p>
+                                                <p className="text-xs text-slate-500 mt-0.5">{reg.municipio || "N/A"}</p>
+                                            </td>
+                                            <td className="p-4 flex justify-center gap-2">
+                                                {reg.pdf_url ? <a href={reg.pdf_url} target="_blank" rel="noreferrer" className="text-slate-500 border border-slate-200 hover:text-slate-900 hover:bg-slate-100 px-3 py-1.5 rounded-md text-[10px] font-bold tracking-widest uppercase transition-all shadow-sm">PDF</a> : null}
+                                                {reg.excel_url ? <a href={reg.excel_url} target="_blank" rel="noreferrer" className="text-slate-500 border border-slate-200 hover:text-slate-900 hover:bg-slate-100 px-3 py-1.5 rounded-md text-[10px] font-bold tracking-widest uppercase transition-all shadow-sm">XLS</a> : null}
+                                                {reg.imagen_url ? <a href={reg.imagen_url} target="_blank" rel="noreferrer" className="text-slate-500 border border-slate-200 hover:text-slate-900 hover:bg-slate-100 px-3 py-1.5 rounded-md text-[10px] font-bold tracking-widest uppercase transition-all shadow-sm">IMG</a> : null}
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
@@ -500,7 +534,6 @@ const VistaTecnico = ({ onLogout }) => {
         navigator.geolocation.getCurrentPosition(
             async (pos) => {
                 const lat = pos.coords.latitude; const lon = pos.coords.longitude; 
-                // AQUI: SOLO LAS COORDENADAS LIMPIAS
                 const textoCoords = `${lat}, ${lon}`;
                 let muni = ""; let depto = "";
                 
@@ -514,7 +547,6 @@ const VistaTecnico = ({ onLogout }) => {
                 } catch (e) {}
                 
                 setGpsInfo({ lat: `${lat}`, lon: `${lon}`, direccion: textoCoords }); 
-                // GUARDAR COORDENADAS PURAS EN UBICACION
                 setFormData(prev => ({ ...prev, ubicacion: textoCoords, municipio: muni, departamento: depto })); 
                 setObteniendoGPS(false);
             },

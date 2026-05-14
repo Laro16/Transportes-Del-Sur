@@ -5,14 +5,28 @@ const SUPABASE_BUCKET = "Instalaciones";
 const SUPABASE_TABLE = "instalaciones";
 
 const INITIAL_FORM = {
+    tipo_movimiento: "Instalación", // Nuevo campo clave
     fecha: "", transportista: "", placa: "", negocio: "", cliente: "",
     telefono: "", ubicacion: "", municipio: "", departamento: "", 
     contrato: "", codigo: "", serie: "", modelo: "", tipo: ""
 };
 
-const PHOTO_LABELS = {
-    fachada: "Fachada del negocio", contrato: "Contrato firmado",
-    etiqueta: "Etiqueta del equipo", equipo: "Equipo instalado"
+// Función dinámica para saber qué fotos pedir
+const getPhotoLabels = (tipoMovimiento) => {
+    if (tipoMovimiento === "Retiro") {
+        return {
+            fachada: "Fachada Exterior",
+            contrato: "Orden de Retiro / Conformidad",
+            etiqueta: "Etiqueta Técnica",
+            equipo: "Estado Físico del Equipo"
+        };
+    }
+    return {
+        fachada: "Fachada Exterior",
+        contrato: "Documento de Contrato",
+        etiqueta: "Etiqueta Técnica",
+        equipo: "Equipo Final Instalado"
+    };
 };
 
 const getSupabase = () => {
@@ -81,7 +95,7 @@ const EvidenciaInput = ({ titulo, nameKey, fotoValue, onFotoChange, onRemove, er
 
 
 // ==========================================
-// 1. COMPONENTE: PANEL DE ADMINISTRADOR (HÍBRIDO)
+// 1. COMPONENTE: PANEL DE ADMINISTRADOR
 // ==========================================
 const PanelAdmin = ({ onLogout }) => {
     const [registrosBD, setRegistrosBD] = useState([]);
@@ -125,7 +139,7 @@ const PanelAdmin = ({ onLogout }) => {
             if (error) throw error;
             setRegistrosBD(data || []);
         } catch (error) {
-            console.error(error); alert("Error al buscar en el archivo histórico de la nube.");
+            console.error(error); alert("Error al buscar en la nube.");
         } finally {
             setCargando(false);
         }
@@ -144,7 +158,8 @@ const PanelAdmin = ({ onLogout }) => {
                 (r.departamento && r.departamento.toLowerCase().includes(termino)) ||
                 (r.codigo && r.codigo.toLowerCase().includes(termino)) ||
                 (r.telefono && r.telefono.toLowerCase().includes(termino)) ||
-                (r.contrato && r.contrato.toLowerCase().includes(termino))
+                (r.contrato && r.contrato.toLowerCase().includes(termino)) ||
+                (r.tipo_movimiento && r.tipo_movimiento.toLowerCase().includes(termino))
             );
         }
         setRegistrosFiltrados(resultado);
@@ -156,17 +171,18 @@ const PanelAdmin = ({ onLogout }) => {
     };
 
     const descargarExcelMaestro = () => {
-        if (registrosFiltrados.length === 0) return alert("No hay registros en pantalla para descargar.");
+        if (registrosFiltrados.length === 0) return alert("No hay registros en pantalla.");
         const wb = window.XLSX.utils.book_new();
         const datosMaestros = registrosFiltrados.map(r => ({
             "ID Registro": r.registro_id, 
             "Fecha": formatearFechaDisplay(r.fecha), 
+            "Tipo Movimiento": r.tipo_movimiento || "Instalación",
             "Transportista": r.transportista,
             "Placa": r.placa, 
             "Negocio": r.negocio, 
             "Cliente": r.cliente, 
             "Teléfono": r.telefono,
-            "Contrato": r.contrato, 
+            "Documento/Boleta": r.contrato, 
             "Código Equipo": r.codigo, 
             "Serie Equipo": r.serie,
             "Modelo Equipo": r.modelo, 
@@ -186,14 +202,16 @@ const PanelAdmin = ({ onLogout }) => {
     };
 
     const descargarZip = async () => {
-        if (registrosFiltrados.length === 0) return alert("No hay registros en pantalla para empaquetar.");
+        if (registrosFiltrados.length === 0) return alert("No hay registros para empaquetar.");
         setDescargandoZip(true);
         try {
             const zip = new window.JSZip();
             for (const reg of registrosFiltrados) {
                 const idCorto = reg.registro_id.slice(0, 5);
-                const nombreCarpeta = `Instalacion_${reg.negocio}_${formatearFechaDisplay(reg.fecha)}_${idCorto}`.replace(/[^a-z0-9_]/gi, '_');
+                const tipo = reg.tipo_movimiento === "Retiro" ? "Retiro" : "Instalacion";
+                const nombreCarpeta = `${tipo}_${reg.negocio}_${formatearFechaDisplay(reg.fecha)}_${idCorto}`.replace(/[^a-z0-9_]/gi, '_');
                 const carpetaRegistro = zip.folder(nombreCarpeta);
+                
                 const agregarArchivo = async (url, nombre) => {
                     if (!url) return;
                     try {
@@ -202,9 +220,9 @@ const PanelAdmin = ({ onLogout }) => {
                         carpetaRegistro.file(nombre, blob);
                     } catch (e) { console.error(e); }
                 };
-                await agregarArchivo(reg.pdf_url, `Reporte_${reg.negocio}.pdf`);
-                await agregarArchivo(reg.imagen_url, `Evidencia_${reg.negocio}.jpg`);
-                await agregarArchivo(reg.excel_url, `Datos_${reg.negocio}.xlsx`);
+                await agregarArchivo(reg.pdf_url, `Reporte_${tipo}.pdf`);
+                await agregarArchivo(reg.imagen_url, `Evidencia_${tipo}.jpg`);
+                await agregarArchivo(reg.excel_url, `Datos_${tipo}.xlsx`);
             }
             const contenidoZip = await zip.generateAsync({ type: "blob" });
             window.saveAs(contenidoZip, `Archivos_Completos_${formatearFechaDisplay(fechaDesde) || 'Historico'}.zip`);
@@ -240,7 +258,7 @@ const PanelAdmin = ({ onLogout }) => {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <div>
                         <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">1. Filtro Rápido en Pantalla</label>
-                        <input type="text" placeholder="Escribe un cliente, placa, municipio, código de equipo..." value={busquedaGlobal} onChange={e => setBusquedaGlobal(e.target.value)} className="w-full p-3.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-slate-800 outline-none transition-all shadow-inner bg-slate-50" />
+                        <input type="text" placeholder="Instalación, Retiro, Cliente, Placa, Municipio..." value={busquedaGlobal} onChange={e => setBusquedaGlobal(e.target.value)} className="w-full p-3.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-slate-800 outline-none transition-all shadow-inner bg-slate-50" />
                         <p className="text-[10px] text-slate-400 mt-2">Filtra instantáneamente sobre los resultados cargados abajo.</p>
                     </div>
 
@@ -279,7 +297,7 @@ const PanelAdmin = ({ onLogout }) => {
                     <table className="w-full text-left border-collapse min-w-[1300px]">
                         <thead>
                             <tr className="bg-slate-50 text-slate-400 text-[10px] uppercase tracking-widest border-b border-slate-200">
-                                <th className="p-4 font-semibold">Fecha</th>
+                                <th className="p-4 font-semibold">Fecha / Movimiento</th>
                                 <th className="p-4 font-semibold">Negocio / Cliente</th>
                                 <th className="p-4 font-semibold">Transportista (Placa)</th>
                                 <th className="p-4 font-semibold">Eq. Código / Detalle</th>
@@ -289,21 +307,18 @@ const PanelAdmin = ({ onLogout }) => {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {cargando ? (
-                                <tr>
-                                    <td colSpan="6" className="p-16 text-center text-slate-500 text-sm font-medium">
-                                        <div className="animate-pulse">Sincronizando con la nube de Transportes Del Sur...</div>
-                                    </td>
-                                </tr>
+                                <tr><td colSpan="6" className="p-16 text-center text-slate-500 text-sm font-medium"><div className="animate-pulse">Sincronizando con la nube de Transportes Del Sur...</div></td></tr>
                             ) : registrosFiltrados.length === 0 ? (
-                                <tr>
-                                    <td colSpan="6" className="p-16 text-center text-slate-400 text-sm">
-                                        No hay registros que coincidan con tu búsqueda.
-                                    </td>
-                                </tr>
+                                <tr><td colSpan="6" className="p-16 text-center text-slate-400 text-sm">No hay registros que coincidan con tu búsqueda.</td></tr>
                             ) : (
                                 registrosFiltrados.map((reg) => (
                                     <tr key={reg.registro_id} className="hover:bg-slate-50/50 transition-colors text-sm text-slate-600">
-                                        <td className="p-4 font-medium text-slate-900">{formatearFechaDisplay(reg.fecha)}</td>
+                                        <td className="p-4">
+                                            <p className="font-medium text-slate-900 mb-1">{formatearFechaDisplay(reg.fecha)}</p>
+                                            <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-md border ${reg.tipo_movimiento === 'Retiro' ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-indigo-50 text-indigo-600 border-indigo-200'}`}>
+                                                {reg.tipo_movimiento || "Instalación"}
+                                            </span>
+                                        </td>
                                         <td className="p-4">
                                             <p className="font-semibold text-slate-900">{reg.negocio}</p>
                                             <p className="text-xs text-slate-500 mt-0.5">{reg.cliente} <span className="text-slate-300 mx-1">|</span> {reg.telefono}</p>
@@ -390,7 +405,10 @@ const VistaTecnico = ({ onLogout }) => {
         if (formData.telefono && soloDigitos.length < 8) nextErrors.telefono = "Mínimo 8 dígitos.";
         if (formData.fecha && Number.isNaN(new Date(formData.fecha).getTime())) nextErrors.fecha = "Fecha inválida.";
         if (formData.ubicacion && /obteniendo datos satelitales/i.test(String(formData.ubicacion))) nextErrors.ubicacion = "Esperando GPS...";
-        Object.keys(PHOTO_LABELS).forEach((key) => { if (!fotos[key]) nextErrors[`foto_${key}`] = "Falta evidencia."; });
+        
+        const etiquetas_fotos = getPhotoLabels(formData.tipo_movimiento);
+        Object.keys(etiquetas_fotos).forEach((key) => { if (!fotos[key]) nextErrors[`foto_${key}`] = "Falta evidencia."; });
+        
         return nextErrors;
     };
 
@@ -438,7 +456,10 @@ const VistaTecnico = ({ onLogout }) => {
                 ctx.font = `bold ${fontSize}px Arial`; ctx.textBaseline = "top"; ctx.textAlign = "right";
                 ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = "rgba(0,0,0,0.75)"; ctx.lineWidth = Math.max(2, Math.round(fontSize * 0.15));
                 ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 4; ctx.shadowOffsetX = 1; ctx.shadowOffsetY = 1;
-                const rows = [`NEGOCIO: ${datos.negocio}`, `FECHA: ${datos.fecha}`, `HORA: ${datos.hora}`, `MUNICIPIO: ${datos.municipio}`, `DEPTO: ${datos.departamento}`, `GPS: ${datos.lat}, ${datos.lon}`].map(row => fitTextSingleLine(ctx, row, Math.round(canvas.width * 0.55)));
+                
+                const headerMovimiento = `TIPO: ${formData.tipo_movimiento.toUpperCase()}`;
+                const rows = [headerMovimiento, `NEGOCIO: ${datos.negocio}`, `FECHA: ${datos.fecha}`, `HORA: ${datos.hora}`, `MUNICIPIO: ${datos.municipio}`, `DEPTO: ${datos.departamento}`, `GPS: ${datos.lat}, ${datos.lon}`].map(row => fitTextSingleLine(ctx, row, Math.round(canvas.width * 0.55)));
+                
                 let y = canvas.height - margin - (rows.length * lineHeight); const x = canvas.width - margin;
                 rows.forEach((linea) => { ctx.strokeText(linea, x, y); ctx.fillText(linea, x, y); y += lineHeight; });
                 resolve(canvas.toDataURL("image/jpeg", 0.88));
@@ -452,7 +473,7 @@ const VistaTecnico = ({ onLogout }) => {
         try {
             const imgComp = await comprimirImagen(file);
             const hora = formatearHoraSolo(new Date());
-            const cand = gpsInfo.direccion || formData.ubicacion || "";
+            const coords = gpsInfo.lat ? `${gpsInfo.lat}, ${gpsInfo.lon}` : "SIN UBICACIÓN";
             const final = await estamparDatosEnImagen(imgComp, { 
                 negocio: formData.negocio?.trim() || "NEGOCIO", 
                 fecha: formatearFechaDisplay(formData.fecha) || "Sin Fecha", 
@@ -479,9 +500,9 @@ const VistaTecnico = ({ onLogout }) => {
         navigator.geolocation.getCurrentPosition(
             async (pos) => {
                 const lat = pos.coords.latitude; const lon = pos.coords.longitude; 
-                let texto = `${lat}, ${lon}`;
-                let muni = "";
-                let depto = "";
+                // AQUI: SOLO LAS COORDENADAS LIMPIAS
+                const textoCoords = `${lat}, ${lon}`;
+                let muni = ""; let depto = "";
                 
                 try {
                     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
@@ -489,14 +510,12 @@ const VistaTecnico = ({ onLogout }) => {
                     if (data?.address) {
                         muni = data.address.city || data.address.town || data.address.village || "";
                         depto = data.address.state || "";
-                        const lugar = [muni, depto].filter(Boolean).join(", ");
-                        // AQUÍ SE QUITARON LOS PARÉNTESIS DE LAS COORDENADAS
-                        if (lugar) texto = `${lugar}, ${lat}, ${lon}`;
                     }
                 } catch (e) {}
                 
-                setGpsInfo({ lat: `${lat}`, lon: `${lon}`, direccion: texto }); 
-                setFormData(prev => ({ ...prev, ubicacion: texto, municipio: muni, departamento: depto })); 
+                setGpsInfo({ lat: `${lat}`, lon: `${lon}`, direccion: textoCoords }); 
+                // GUARDAR COORDENADAS PURAS EN UBICACION
+                setFormData(prev => ({ ...prev, ubicacion: textoCoords, municipio: muni, departamento: depto })); 
                 setObteniendoGPS(false);
             },
             () => { alert("Activa el GPS en modo Alta Precisión."); setFormData(prev => ({ ...prev, ubicacion: "", municipio: "", departamento: "" })); setGpsInfo({ lat: "", lon: "", direccion: "" }); setObteniendoGPS(false); },
@@ -520,20 +539,22 @@ const VistaTecnico = ({ onLogout }) => {
         }
         setGenerando(true);
         const regId = buildRegistroId(); const sNeg = sanitizeFileName(formData.negocio); const sFec = sanitizeFileName(formData.fecha);
-        const pName = `Instalacion_${sNeg}_${sFec}.pdf`; const xName = `registro_${sNeg}_${sFec}.xlsx`; const iName = `Resumen_${sNeg}_${sFec}.jpg`;
+        const prefix = formData.tipo_movimiento === "Retiro" ? "Retiro" : "Instalacion";
+        const pName = `Reporte_${prefix}_${sNeg}_${sFec}.pdf`; const xName = `Datos_${prefix}_${sNeg}_${sFec}.xlsx`; const iName = `Evidencia_${prefix}_${sNeg}_${sFec}.jpg`;
 
         try {
             const area = document.getElementById("molde-imagen-whatsapp");
             const canvas = await window.html2canvas(area, { scale: 3, useCORS: true, backgroundColor: "#ffffff" });
             const imageBlob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.88));
 
-            const doc = new window.jspdf.jsPDF(); doc.setFontSize(18); doc.text("Reporte de Instalación", 15, 20); doc.setFontSize(12);
+            const doc = new window.jspdf.jsPDF(); doc.setFontSize(18); doc.text(`Reporte de ${formData.tipo_movimiento}`, 15, 20); doc.setFontSize(12);
             
             const dataParaPDF = Object.entries(formData).map(([k, v]) => [k.toUpperCase(), k === 'fecha' ? formatearFechaDisplay(v) : String(v || "")]);
             doc.autoTable({ startY: 30, head: [["Campo", "Información"]], body: dataParaPDF });
             
+            const etiquetas_fotos = getPhotoLabels(formData.tipo_movimiento);
             for (const [k, b64] of Object.entries(fotos)) {
-                if (!b64) continue; doc.addPage(); doc.text(`Evidencia: ${PHOTO_LABELS[k] || k}`, 15, 20);
+                if (!b64) continue; doc.addPage(); doc.text(`Evidencia: ${etiquetas_fotos[k] || k}`, 15, 20);
                 const props = doc.getImageProperties(b64); const w = doc.internal.pageSize.getWidth(); const h = doc.internal.pageSize.getHeight();
                 let fw = w - 30; let fh = (props.height * fw) / props.width;
                 if (fh > h - 45) { fh = h - 45; fw = (props.width * fh) / props.height; }
@@ -544,7 +565,7 @@ const VistaTecnico = ({ onLogout }) => {
             const wb = window.XLSX.utils.book_new();
             const registroParaExcel = { ...formData, fecha: formatearFechaDisplay(formData.fecha) };
             window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet([registroParaExcel]), "Registro");
-            window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(Object.entries(PHOTO_LABELS).map(([k, l]) => ({ Evidencia: l, Estado: fotos[k] ? "Adjunta" : "Pendiente" }))), "Evidencias");
+            window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(Object.entries(etiquetas_fotos).map(([k, l]) => ({ Evidencia: l, Estado: fotos[k] ? "Adjunta" : "Pendiente" }))), "Evidencias");
             const xlsxBlob = new Blob([window.XLSX.write(wb, { bookType: "xlsx", type: "array" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 
             const [p, x, i] = await Promise.all([
@@ -554,7 +575,8 @@ const VistaTecnico = ({ onLogout }) => {
             ]);
 
             const { error: insErr } = await getSupabase().from(SUPABASE_TABLE).insert([{
-                registro_id: regId, fecha: formData.fecha, negocio: formData.negocio, cliente: formData.cliente,
+                registro_id: regId, fecha: formData.fecha, tipo_movimiento: formData.tipo_movimiento,
+                negocio: formData.negocio, cliente: formData.cliente,
                 transportista: formData.transportista, placa: formData.placa, contrato: formData.contrato,
                 codigo: formData.codigo, serie: formData.serie, modelo: formData.modelo, tipo: formData.tipo,
                 telefono: formData.telefono, ubicacion: formData.ubicacion, 
@@ -566,25 +588,27 @@ const VistaTecnico = ({ onLogout }) => {
 
             skipDraftSaveRef.current = true; clearDraft(); resetForm();
             setTimeout(() => { skipDraftSaveRef.current = false; }, 0);
-            alert("¡Éxito! Archivos generados y subidos a la nube.");
+            alert(`¡Éxito! Reporte de ${formData.tipo_movimiento} guardado en la nube.`);
         } catch (e) { console.error(e); alert("Error al guardar en la nube."); } finally { setGenerando(false); }
     };
+
+    const etiquetasActuales = getPhotoLabels(formData.tipo_movimiento);
 
     return (
         <div className="bg-slate-100 min-h-screen font-sans">
             <div id="molde-imagen-whatsapp" className="fixed top-0 left-[-9999px] bg-white p-10 w-[1200px]">
-                <div className="bg-slate-900 text-white p-6 text-center rounded-xl mb-8"><h2 className="text-4xl font-bold mb-2">Transportes Del Sur</h2><p className="text-xl font-light tracking-widest uppercase">Reporte de Instalación</p></div>
+                <div className="bg-slate-900 text-white p-6 text-center rounded-xl mb-8"><h2 className="text-4xl font-bold mb-2">Transportes Del Sur</h2><p className="text-xl font-light tracking-widest uppercase">Reporte de {formData.tipo_movimiento}</p></div>
                 <div className="grid grid-cols-2 gap-6 mb-8 bg-slate-50 p-6 rounded-xl border-2 border-slate-200 text-xl text-slate-700">
                     <p><span className="font-bold text-slate-900">Fecha:</span> {formatearFechaDisplay(formData.fecha)}</p><p><span className="font-bold text-slate-900">Transportista:</span> {formData.transportista}</p>
                     <p><span className="font-bold text-slate-900">Placa:</span> {formData.placa}</p><p><span className="font-bold text-slate-900">Negocio:</span> {formData.negocio}</p>
                     <p><span className="font-bold text-slate-900">Cliente:</span> {formData.cliente}</p><p><span className="font-bold text-slate-900">Teléfono:</span> {formData.telefono}</p>
                     <p><span className="font-bold text-slate-900">Municipio:</span> {formData.municipio || "N/A"}</p><p><span className="font-bold text-slate-900">Depto:</span> {formData.departamento || "N/A"}</p>
                     <p className="col-span-2"><span className="font-bold text-slate-900">GPS Exacto:</span> {formData.ubicacion}</p>
-                    <p><span className="font-bold text-slate-900">Contrato:</span> {formData.contrato}</p><p><span className="font-bold text-slate-900">Código Eq:</span> {formData.codigo}</p>
+                    <p><span className="font-bold text-slate-900">Contrato/Orden:</span> {formData.contrato}</p><p><span className="font-bold text-slate-900">Código Eq:</span> {formData.codigo}</p>
                     <p><span className="font-bold text-slate-900">Serie Eq:</span> {formData.serie}</p><p><span className="font-bold text-slate-900">Modelo Eq:</span> {formData.modelo} ({formData.tipo})</p>
                 </div>
                 <div className="grid grid-cols-2 gap-6">
-                    {Object.entries(PHOTO_LABELS).map(([k, t]) => fotos[k] && (<div key={k} className="border-2 border-slate-200 p-6 rounded-xl text-center bg-white"><p className="font-bold text-slate-800 mb-4 text-2xl uppercase">{t}</p><img src={fotos[k]} className="w-full h-[500px] object-cover rounded-lg" alt={t} /></div>))}
+                    {Object.entries(etiquetasActuales).map(([k, t]) => fotos[k] && (<div key={k} className="border-2 border-slate-200 p-6 rounded-xl text-center bg-white"><p className="font-bold text-slate-800 mb-4 text-2xl uppercase">{t}</p><img src={fotos[k]} className="w-full h-[500px] object-cover rounded-lg" alt={t} /></div>))}
                 </div>
             </div>
 
@@ -598,10 +622,21 @@ const VistaTecnico = ({ onLogout }) => {
                 </header>
 
                 <form onSubmit={generarDocumentos} className="px-6 space-y-8">
+
+                    <div className="bg-slate-50 p-3 rounded-2xl flex gap-2 border border-slate-200 shadow-inner">
+                        <label className={`flex-1 text-center py-3 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer transition-all ${formData.tipo_movimiento === 'Instalación' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200'}`}>
+                            <input type="radio" name="tipo_movimiento" value="Instalación" checked={formData.tipo_movimiento === 'Instalación'} onChange={handleChange} className="hidden" />
+                            Instalación
+                        </label>
+                        <label className={`flex-1 text-center py-3 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer transition-all ${formData.tipo_movimiento === 'Retiro' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200'}`}>
+                            <input type="radio" name="tipo_movimiento" value="Retiro" checked={formData.tipo_movimiento === 'Retiro'} onChange={handleChange} className="hidden" />
+                            Retiro
+                        </label>
+                    </div>
                     
                     <div>
                         <h3 className="text-sm font-bold text-slate-800 mb-4 uppercase tracking-widest flex items-center gap-2"><span className="bg-slate-200 w-6 h-6 rounded-full flex items-center justify-center text-slate-600 text-xs">1</span> Transporte</h3>
-                        <InputForm label="Fecha de Instalación" type="date" name="fecha" value={formData.fecha} onChange={handleChange} error={errors.fecha} />
+                        <InputForm label="Fecha" type="date" name="fecha" value={formData.fecha} onChange={handleChange} error={errors.fecha} />
                         <InputForm label="Transportista Asignado" name="transportista" opts={opciones.transportistas} value={formData.transportista} onChange={handleChange} error={errors.transportista} />
                         <InputForm label="Placa del Vehículo" name="placa" opts={opciones.placas} value={formData.placa} onChange={handleChange} error={errors.placa} />
                     </div>
@@ -618,7 +653,7 @@ const VistaTecnico = ({ onLogout }) => {
                             <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Ubicación GPS</label>
                             <div className="flex gap-2 mb-2">
                                 <button type="button" onClick={obtenerUbicacion} disabled={obteniendoGPS} className={`w-full py-3 text-sm font-bold tracking-widest uppercase rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2 ${obteniendoGPS ? "bg-slate-200 text-slate-400" : "bg-slate-800 text-white hover:bg-slate-900"}`}>
-                                    📍 Obtener Ubicación Actual
+                                    📍 Obtener Coordenadas
                                 </button>
                             </div>
                             <div className="grid grid-cols-2 gap-3 mb-3">
@@ -628,7 +663,7 @@ const VistaTecnico = ({ onLogout }) => {
                             <textarea name="ubicacion" value={formData.ubicacion} readOnly placeholder="Coordenadas exactas..." className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 text-xs h-14 resize-none text-slate-500 focus:outline-none"></textarea>
                             {errors.ubicacion && <p className="text-xs text-rose-500 mt-1.5 font-medium">{errors.ubicacion}</p>}
                         </div>
-                        <InputForm label="Número de Contrato" name="contrato" value={formData.contrato} onChange={handleChange} error={errors.contrato} />
+                        <InputForm label={formData.tipo_movimiento === 'Retiro' ? 'No. Boleta / Orden' : 'Número de Contrato'} name="contrato" value={formData.contrato} onChange={handleChange} error={errors.contrato} />
                     </div>
 
                     <hr className="border-slate-100" />
@@ -643,14 +678,14 @@ const VistaTecnico = ({ onLogout }) => {
 
                     <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
                         <h3 className="text-sm font-bold text-slate-800 mb-4 uppercase tracking-widest flex items-center gap-2"><span className="bg-slate-800 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">4</span> Evidencias Fotográficas</h3>
-                        <EvidenciaInput titulo="Fachada Exterior" nameKey="fachada" fotoValue={fotos.fachada} onFotoChange={handleFoto} onRemove={quitarFoto} error={errors.foto_fachada} />
-                        <EvidenciaInput titulo="Documento de Contrato" nameKey="contrato" fotoValue={fotos.contrato} onFotoChange={handleFoto} onRemove={quitarFoto} error={errors.foto_contrato} />
-                        <EvidenciaInput titulo="Etiqueta Técnica" nameKey="etiqueta" fotoValue={fotos.etiqueta} onFotoChange={handleFoto} onRemove={quitarFoto} error={errors.foto_etiqueta} />
-                        <EvidenciaInput titulo="Equipo Final Instalado" nameKey="equipo" fotoValue={fotos.equipo} onFotoChange={handleFoto} onRemove={quitarFoto} error={errors.foto_equipo} />
+                        <EvidenciaInput titulo={etiquetasActuales.fachada} nameKey="fachada" fotoValue={fotos.fachada} onFotoChange={handleFoto} onRemove={quitarFoto} error={errors.foto_fachada} />
+                        <EvidenciaInput titulo={etiquetasActuales.contrato} nameKey="contrato" fotoValue={fotos.contrato} onFotoChange={handleFoto} onRemove={quitarFoto} error={errors.foto_contrato} />
+                        <EvidenciaInput titulo={etiquetasActuales.etiqueta} nameKey="etiqueta" fotoValue={fotos.etiqueta} onFotoChange={handleFoto} onRemove={quitarFoto} error={errors.foto_etiqueta} />
+                        <EvidenciaInput titulo={etiquetasActuales.equipo} nameKey="equipo" fotoValue={fotos.equipo} onFotoChange={handleFoto} onRemove={quitarFoto} error={errors.foto_equipo} />
                     </div>
 
-                    <button type="submit" disabled={generando} className={`w-full ${generando ? "bg-slate-400" : "bg-slate-900 hover:bg-slate-800 hover:-translate-y-1"} text-white font-bold tracking-widest py-5 rounded-2xl shadow-xl transition-all text-sm uppercase`}>
-                        {generando ? "Procesando Archivos..." : "Generar y Subir Reportes"}
+                    <button type="submit" disabled={generando} className={`w-full ${generando ? "bg-slate-400" : formData.tipo_movimiento === 'Retiro' ? "bg-rose-700 hover:bg-rose-800" : "bg-indigo-700 hover:bg-indigo-800"} text-white font-bold tracking-widest py-5 rounded-2xl shadow-xl transition-all text-sm uppercase`}>
+                        {generando ? "Procesando Archivos..." : `Registrar ${formData.tipo_movimiento}`}
                     </button>
                     <p className="text-center text-slate-400 text-xs mt-4 pb-6">Los datos se sincronizan automáticamente.</p>
                 </form>

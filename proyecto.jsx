@@ -94,7 +94,7 @@ const EvidenciaInput = ({ titulo, nameKey, fotoValue, onFotoChange, onRemove, er
 
 
 // ==========================================
-// 1. COMPONENTE: PANEL DE ADMINISTRADOR (COMPACTO)
+// 1. COMPONENTE: PANEL DE ADMINISTRADOR 
 // ==========================================
 const PanelAdmin = ({ onLogout }) => {
     const [registrosBD, setRegistrosBD] = useState([]);
@@ -102,7 +102,6 @@ const PanelAdmin = ({ onLogout }) => {
     const [cargando, setCargando] = useState(true);
     const [descargandoZip, setDescargandoZip] = useState(false);
 
-    // Estados de Búsqueda
     const [busquedaGlobal, setBusquedaGlobal] = useState("");
     const [fechaDesde, setFechaDesde] = useState("");
     const [fechaHasta, setFechaHasta] = useState("");
@@ -245,150 +244,157 @@ const PanelAdmin = ({ onLogout }) => {
     };
 
     return (
-        <div className="max-w-screen-2xl mx-auto p-4 md:p-6 bg-slate-50 min-h-screen font-sans">
+        <div className="bg-slate-50 min-h-screen font-sans flex flex-col">
             
-            <header className="flex justify-between items-center border-b border-slate-200 pb-4 mb-5">
+            {/* CABECERA OSCURA TIPO SOFTWARE DE ESCRITORIO */}
+            <header className="bg-slate-900 text-white w-full shadow-md py-4 px-6 md:px-8 flex justify-between items-center z-10 relative">
                 <div>
-                    <h1 className="text-2xl font-light tracking-tight text-slate-900 mb-0.5">TRANSPORTES DEL SUR</h1>
+                    <h1 className="text-2xl font-light tracking-tight mb-0.5 text-white">TRANSPORTES DEL SUR</h1>
                     <p className="text-slate-400 text-[10px] tracking-widest uppercase">Dashboard Administrativo</p>
                 </div>
-                <button onClick={onLogout} className="text-slate-500 hover:text-slate-900 text-xs font-bold uppercase tracking-wider transition-colors bg-white px-4 py-2 rounded-lg shadow-sm border border-slate-200">
+                <button onClick={onLogout} className="text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold uppercase tracking-wider transition-all px-4 py-2 rounded-lg border border-slate-700">
                     Cerrar Sesión
                 </button>
             </header>
 
-            <div className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-slate-200 mb-5">
+            {/* CONTENEDOR PRINCIPAL */}
+            <div className="max-w-[1600px] w-full mx-auto p-4 md:p-6 flex-1 flex flex-col">
                 
-                {/* CABECERA DE CONTROLES: Título + Switch + Botón Limpiar en una sola fila */}
-                <div className="flex flex-col xl:flex-row justify-between items-center gap-4 mb-4 border-b border-slate-100 pb-4">
-                    <h2 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                        <span className="text-amber-500 text-base">⚡</span> CONTROL DE BÚSQUEDA
-                    </h2>
+                <div className="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-slate-200 mb-5 mt-2">
                     
-                    <div className="bg-slate-100 p-1 rounded-lg inline-flex shadow-inner overflow-x-auto w-full xl:w-auto justify-start xl:justify-center">
-                        <button type="button" onClick={() => setVistaActiva("Todas")} className={`flex-1 xl:flex-none px-5 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${vistaActiva === 'Todas' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-                            Todas las Operaciones
-                        </button>
-                        <button type="button" onClick={() => setVistaActiva("Instalación")} className={`flex-1 xl:flex-none px-5 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${vistaActiva === 'Instalación' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-                            Solo Instalaciones
-                        </button>
-                        <button type="button" onClick={() => setVistaActiva("Retiro")} className={`flex-1 xl:flex-none px-5 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${vistaActiva === 'Retiro' ? 'bg-rose-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
-                            Solo Retiros
+                    {/* CABECERA DE CONTROLES */}
+                    <div className="flex flex-col xl:flex-row justify-between items-center gap-4 mb-4 border-b border-slate-100 pb-4">
+                        <h2 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                            <span className="text-amber-500 text-base">⚡</span> CONTROL DE BÚSQUEDA
+                        </h2>
+                        
+                        <div className="bg-slate-100 p-1 rounded-lg inline-flex shadow-inner overflow-x-auto w-full xl:w-auto justify-start xl:justify-center">
+                            <button type="button" onClick={() => setVistaActiva("Todas")} className={`flex-1 xl:flex-none px-5 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${vistaActiva === 'Todas' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                                Todas las Operaciones
+                            </button>
+                            <button type="button" onClick={() => setVistaActiva("Instalación")} className={`flex-1 xl:flex-none px-5 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${vistaActiva === 'Instalación' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                                Solo Instalaciones
+                            </button>
+                            <button type="button" onClick={() => setVistaActiva("Retiro")} className={`flex-1 xl:flex-none px-5 py-2 rounded-md text-[10px] font-bold uppercase tracking-widest transition-all whitespace-nowrap ${vistaActiva === 'Retiro' ? 'bg-rose-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                                Solo Retiros
+                            </button>
+                        </div>
+
+                        <button type="button" onClick={limpiarTodo} className="text-[11px] text-slate-400 hover:text-slate-800 transition-colors font-medium flex items-center gap-1">
+                            ↻ Reiniciar Todo
                         </button>
                     </div>
 
-                    <button type="button" onClick={limpiarTodo} className="text-[11px] text-slate-400 hover:text-slate-800 transition-colors font-medium flex items-center gap-1">
-                        ↻ Reiniciar Todo
-                    </button>
-                </div>
+                    {/* FILTROS EN REJILLA COMPACTA */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-end">
+                        <div className="lg:col-span-5">
+                            <label className="block text-[9px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">1. Filtro Rápido en Pantalla</label>
+                            <input type="text" placeholder="Busca por Cliente, Placa, Municipio..." value={busquedaGlobal} onChange={e => setBusquedaGlobal(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none transition-all shadow-inner bg-slate-50" />
+                            <p className="text-[9px] text-slate-400 mt-1.5">Filtra instantáneamente sobre los resultados cargados abajo.</p>
+                        </div>
 
-                {/* FILTROS EN REJILLA COMPACTA */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-end">
-                    <div className="lg:col-span-5">
-                        <label className="block text-[9px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">1. Filtro Rápido en Pantalla</label>
-                        <input type="text" placeholder="Busca por Cliente, Placa, Municipio..." value={busquedaGlobal} onChange={e => setBusquedaGlobal(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none transition-all shadow-inner bg-slate-50" />
-                        <p className="text-[9px] text-slate-400 mt-1.5">Filtra instantáneamente sobre los resultados cargados abajo.</p>
+                        <form onSubmit={buscarEnNube} className="lg:col-span-7 bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col sm:flex-row gap-3 items-end">
+                            <div className="w-full sm:w-auto mb-auto sm:mb-0 hidden sm:block">
+                                <label className="block text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider text-slate-700 whitespace-nowrap">2. Histórico Nube</label>
+                            </div>
+                            <div className="flex-1 w-full">
+                                <label className="block text-[9px] font-semibold text-slate-500 mb-1 uppercase tracking-wider">Fecha Desde</label>
+                                <input type="date" required value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none bg-white" />
+                            </div>
+                            <div className="flex-1 w-full">
+                                <label className="block text-[9px] font-semibold text-slate-500 mb-1 uppercase tracking-wider">Fecha Hasta</label>
+                                <input type="date" required value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none bg-white" />
+                            </div>
+                            <button type="submit" disabled={cargando} className="bg-slate-800 text-white px-5 py-2 rounded-lg text-[11px] font-bold tracking-widest uppercase hover:bg-slate-900 transition-colors shadow-sm w-full sm:w-auto h-[38px] whitespace-nowrap">
+                                {cargando ? "⏳..." : "Buscar"}
+                            </button>
+                        </form>
                     </div>
-
-                    <form onSubmit={buscarEnNube} className="lg:col-span-7 bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col sm:flex-row gap-3 items-end">
-                        <div className="w-full sm:w-auto mb-auto sm:mb-0 hidden sm:block">
-                            <label className="block text-[9px] font-bold text-slate-400 mb-1 uppercase tracking-wider text-slate-700 whitespace-nowrap">2. Histórico Nube</label>
-                        </div>
-                        <div className="flex-1 w-full">
-                            <label className="block text-[9px] font-semibold text-slate-500 mb-1 uppercase tracking-wider">Fecha Desde</label>
-                            <input type="date" required value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none bg-white" />
-                        </div>
-                        <div className="flex-1 w-full">
-                            <label className="block text-[9px] font-semibold text-slate-500 mb-1 uppercase tracking-wider">Fecha Hasta</label>
-                            <input type="date" required value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} className="w-full p-2 border border-slate-300 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none bg-white" />
-                        </div>
-                        <button type="submit" disabled={cargando} className="bg-slate-800 text-white px-5 py-2 rounded-lg text-[11px] font-bold tracking-widest uppercase hover:bg-slate-900 transition-colors shadow-sm w-full sm:w-auto h-[38px] whitespace-nowrap">
-                            {cargando ? "⏳..." : "Buscar"}
-                        </button>
-                    </form>
                 </div>
-            </div>
 
-            {/* CABECERA DE LA TABLA + BOTONES DE DESCARGA */}
-            <div className="flex flex-col md:flex-row justify-between items-end mb-3 gap-3">
-                <div className="flex items-center gap-2 px-1">
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest bg-slate-200 px-2 py-1 rounded">
-                        Resultados: {registrosFiltrados.length}
-                    </span>
-                    <span className="text-[10px] text-slate-400 uppercase tracking-wider">
-                        ({vistaActiva})
-                    </span>
-                </div>
-                
-                {registrosFiltrados.length > 0 && !cargando && (
-                    <div className="flex gap-2 w-full md:w-auto">
-                        <button onClick={descargarExcelMaestro} className="flex-1 md:flex-none px-4 py-2 text-[10px] font-bold tracking-wider uppercase text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm flex items-center justify-center gap-1.5">
-                            <span className="text-emerald-600">📊</span> Descargar Excel
-                        </button>
-                        <button onClick={descargarZip} disabled={descargandoZip} className={`flex-1 md:flex-none px-4 py-2 text-[10px] font-bold tracking-wider uppercase bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all shadow-sm flex items-center justify-center gap-1.5 ${descargandoZip ? 'opacity-50' : ''}`}>
-                            <span className="text-amber-500">📦</span> {descargandoZip ? "Creando ZIP..." : `Descargar ZIP`}
-                        </button>
+                {/* CABECERA DE LA TABLA + BOTONES DE DESCARGA */}
+                <div className="flex flex-col md:flex-row justify-between items-end mb-3 gap-3">
+                    <div className="flex items-center gap-2 px-1">
+                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest bg-slate-200 px-2 py-1 rounded">
+                            Resultados: {registrosFiltrados.length}
+                        </span>
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider">
+                            ({vistaActiva})
+                        </span>
                     </div>
-                )}
-            </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[1250px]">
-                        <thead>
-                            <tr className="bg-slate-50 text-slate-400 text-[10px] uppercase tracking-widest border-b border-slate-200">
-                                <th className="p-3 font-semibold w-24">Movimiento</th>
-                                <th className="p-3 font-semibold">Negocio / Cliente</th>
-                                <th className="p-3 font-semibold">Transportista (Placa)</th>
-                                <th className="p-3 font-semibold">Eq. Código / Detalle</th>
-                                <th className="p-3 font-semibold">Depto / Municipio</th>
-                                <th className="p-3 font-semibold text-center w-36">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {cargando ? (
-                                <tr><td colSpan="6" className="p-12 text-center text-slate-500 text-sm font-medium"><div className="animate-pulse">Sincronizando base de datos...</div></td></tr>
-                            ) : registrosFiltrados.length === 0 ? (
-                                <tr><td colSpan="6" className="p-12 text-center text-slate-400 text-sm">No hay registros en esta vista.</td></tr>
-                            ) : (
-                                registrosFiltrados.map((reg) => {
-                                    const tipoMov = reg.tipo_movimiento || "Instalación";
-                                    return (
-                                        <tr key={reg.registro_id} className="hover:bg-slate-50/50 transition-colors text-sm text-slate-600">
-                                            <td className="p-3">
-                                                <p className="font-medium text-slate-900 text-xs mb-1.5">{formatearFechaDisplay(reg.fecha)}</p>
-                                                <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border ${tipoMov === 'Retiro' ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-indigo-50 text-indigo-600 border-indigo-200'}`}>
-                                                    {tipoMov}
-                                                </span>
-                                            </td>
-                                            <td className="p-3">
-                                                <p className="font-semibold text-slate-900 text-xs">{reg.negocio}</p>
-                                                <p className="text-[11px] text-slate-500 mt-0.5">{reg.cliente} <span className="text-slate-300 mx-1">|</span> {reg.telefono}</p>
-                                            </td>
-                                            <td className="p-3">
-                                                <p className="font-medium text-slate-800 text-xs">{reg.transportista}</p>
-                                                <p className="text-[11px] text-slate-500 mt-0.5">{reg.placa}</p>
-                                            </td>
-                                            <td className="p-3">
-                                                <p className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 inline-block mb-1">{reg.codigo}</p>
-                                                <p className="text-[11px] text-slate-500">{reg.modelo} ({reg.tipo})</p>
-                                            </td>
-                                            <td className="p-3">
-                                                <p className="font-medium text-slate-800 text-xs">{reg.departamento || "N/A"}</p>
-                                                <p className="text-[11px] text-slate-500 mt-0.5">{reg.municipio || "N/A"}</p>
-                                            </td>
-                                            <td className="p-3 flex justify-center gap-1.5">
-                                                {reg.pdf_url ? <a href={reg.pdf_url} target="_blank" rel="noreferrer" className="text-slate-500 border border-slate-200 hover:text-slate-900 hover:bg-slate-100 px-2 py-1 rounded-md text-[9px] font-bold tracking-widest uppercase transition-all shadow-sm">PDF</a> : null}
-                                                {reg.excel_url ? <a href={reg.excel_url} target="_blank" rel="noreferrer" className="text-slate-500 border border-slate-200 hover:text-slate-900 hover:bg-slate-100 px-2 py-1 rounded-md text-[9px] font-bold tracking-widest uppercase transition-all shadow-sm">XLS</a> : null}
-                                                {reg.imagen_url ? <a href={reg.imagen_url} target="_blank" rel="noreferrer" className="text-slate-500 border border-slate-200 hover:text-slate-900 hover:bg-slate-100 px-2 py-1 rounded-md text-[9px] font-bold tracking-widest uppercase transition-all shadow-sm">IMG</a> : null}
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
+                    
+                    {registrosFiltrados.length > 0 && !cargando && (
+                        <div className="flex gap-2 w-full md:w-auto">
+                            <button onClick={descargarExcelMaestro} className="flex-1 md:flex-none px-4 py-2 text-[10px] font-bold tracking-wider uppercase text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm flex items-center justify-center gap-1.5">
+                                <span className="text-emerald-600">📊</span> Descargar Excel
+                            </button>
+                            <button onClick={descargarZip} disabled={descargandoZip} className={`flex-1 md:flex-none px-4 py-2 text-[10px] font-bold tracking-wider uppercase bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all shadow-sm flex items-center justify-center gap-1.5 ${descargandoZip ? 'opacity-50' : ''}`}>
+                                <span className="text-amber-500">📦</span> {descargandoZip ? "Creando ZIP..." : `Descargar ZIP`}
+                            </button>
+                        </div>
+                    )}
                 </div>
+
+                {/* TABLA CON ENCABEZADO OSCURO Y DIVISIONES */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex-1">
+                    <div className="overflow-x-auto h-full">
+                        <table className="w-full text-left border-collapse min-w-[1250px] border border-slate-200">
+                            <thead>
+                                <tr className="bg-slate-100 text-slate-700 text-[10px] uppercase tracking-widest border-b-2 border-slate-300">
+                                    <th className="p-3 font-bold border-r border-slate-200 w-28">Movimiento</th>
+                                    <th className="p-3 font-bold border-r border-slate-200">Negocio / Cliente</th>
+                                    <th className="p-3 font-bold border-r border-slate-200">Transportista (Placa)</th>
+                                    <th className="p-3 font-bold border-r border-slate-200">Eq. Código / Detalle</th>
+                                    <th className="p-3 font-bold border-r border-slate-200">Depto / Municipio</th>
+                                    <th className="p-3 font-bold text-center w-36">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {cargando ? (
+                                    <tr><td colSpan="6" className="p-12 text-center text-slate-500 text-sm font-medium border-t border-slate-200"><div className="animate-pulse">Sincronizando base de datos...</div></td></tr>
+                                ) : registrosFiltrados.length === 0 ? (
+                                    <tr><td colSpan="6" className="p-12 text-center text-slate-400 text-sm border-t border-slate-200">No hay registros en esta vista.</td></tr>
+                                ) : (
+                                    registrosFiltrados.map((reg) => {
+                                        const tipoMov = reg.tipo_movimiento || "Instalación";
+                                        return (
+                                            <tr key={reg.registro_id} className="hover:bg-slate-50 transition-colors text-sm text-slate-600 border-b border-slate-200 last:border-b-0">
+                                                <td className="p-3 border-r border-slate-200">
+                                                    <p className="font-medium text-slate-900 text-xs mb-1.5">{formatearFechaDisplay(reg.fecha)}</p>
+                                                    <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-md border ${tipoMov === 'Retiro' ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-indigo-50 text-indigo-600 border-indigo-200'}`}>
+                                                        {tipoMov}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3 border-r border-slate-200">
+                                                    <p className="font-semibold text-slate-900 text-xs">{reg.negocio}</p>
+                                                    <p className="text-[11px] text-slate-500 mt-0.5">{reg.cliente} <span className="text-slate-300 mx-1">|</span> {reg.telefono}</p>
+                                                </td>
+                                                <td className="p-3 border-r border-slate-200">
+                                                    <p className="font-medium text-slate-800 text-xs">{reg.transportista}</p>
+                                                    <p className="text-[11px] text-slate-500 mt-0.5">{reg.placa}</p>
+                                                </td>
+                                                <td className="p-3 border-r border-slate-200">
+                                                    <p className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 inline-block mb-1 border border-slate-200">{reg.codigo}</p>
+                                                    <p className="text-[11px] text-slate-500">{reg.modelo} ({reg.tipo})</p>
+                                                </td>
+                                                <td className="p-3 border-r border-slate-200">
+                                                    <p className="font-medium text-slate-800 text-xs">{reg.departamento || "N/A"}</p>
+                                                    <p className="text-[11px] text-slate-500 mt-0.5">{reg.municipio || "N/A"}</p>
+                                                </td>
+                                                <td className="p-3 flex justify-center gap-1.5 h-full items-center">
+                                                    {reg.pdf_url ? <a href={reg.pdf_url} target="_blank" rel="noreferrer" className="text-slate-500 border border-slate-200 hover:text-slate-900 hover:bg-slate-100 px-2 py-1 rounded-md text-[9px] font-bold tracking-widest uppercase transition-all shadow-sm">PDF</a> : null}
+                                                    {reg.excel_url ? <a href={reg.excel_url} target="_blank" rel="noreferrer" className="text-slate-500 border border-slate-200 hover:text-slate-900 hover:bg-slate-100 px-2 py-1 rounded-md text-[9px] font-bold tracking-widest uppercase transition-all shadow-sm">XLS</a> : null}
+                                                    {reg.imagen_url ? <a href={reg.imagen_url} target="_blank" rel="noreferrer" className="text-slate-500 border border-slate-200 hover:text-slate-900 hover:bg-slate-100 px-2 py-1 rounded-md text-[9px] font-bold tracking-widest uppercase transition-all shadow-sm">IMG</a> : null}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
             </div>
         </div>
     );

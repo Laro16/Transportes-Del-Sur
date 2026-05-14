@@ -81,7 +81,7 @@ const EvidenciaInput = ({ titulo, nameKey, fotoValue, onFotoChange, onRemove, er
 
 
 // ==========================================
-// 1. COMPONENTE: PANEL DE ADMINISTRADOR (TIEMPO REAL)
+// 1. COMPONENTE: PANEL DE ADMINISTRADOR (HÍBRIDO)
 // ==========================================
 const PanelAdmin = ({ onLogout }) => {
     const [registrosBD, setRegistrosBD] = useState([]);
@@ -89,40 +89,59 @@ const PanelAdmin = ({ onLogout }) => {
     const [cargando, setCargando] = useState(true);
     const [descargandoZip, setDescargandoZip] = useState(false);
 
-    // Estados de Filtros Dinámicos
+    // Estados de Búsqueda
     const [busquedaGlobal, setBusquedaGlobal] = useState("");
     const [fechaDesde, setFechaDesde] = useState("");
     const [fechaHasta, setFechaHasta] = useState("");
 
-    // Descargar todos los registros al abrir el panel
+    // Función para traer los últimos 2000 (Carga inicial o al limpiar)
+    const cargarRecientes = async () => {
+        setCargando(true);
+        try {
+            const supabase = getSupabase();
+            const { data, error } = await supabase.from(SUPABASE_TABLE).select('*').order('fecha', { ascending: false }).limit(2000);
+            if (error) throw error;
+            setRegistrosBD(data || []);
+        } catch (error) {
+            console.error(error); alert("Error al cargar la base de datos.");
+        } finally {
+            setCargando(false);
+        }
+    };
+
+    // Descargar al abrir el panel
     useEffect(() => {
-        const fetchDatosIniciales = async () => {
-            setCargando(true);
-            try {
-                const supabase = getSupabase();
-                // Traemos los últimos 2000 registros para mantener la memoria rápida
-                const { data, error } = await supabase.from(SUPABASE_TABLE).select('*').order('fecha', { ascending: false }).limit(2000);
-                if (error) throw error;
-                setRegistrosBD(data || []);
-                setRegistrosFiltrados(data || []);
-            } catch (error) {
-                console.error(error); alert("Error al cargar la base de datos.");
-            } finally {
-                setCargando(false);
-            }
-        };
-        fetchDatosIniciales();
+        cargarRecientes();
     }, []);
 
-    // Motor de búsqueda en Tiempo Real
+    // MOTOR 1: Búsqueda Histórica en la Nube (Al hacer click en el botón)
+    const buscarEnNube = async (e) => {
+        e.preventDefault();
+        setCargando(true);
+        try {
+            const supabase = getSupabase();
+            // Trae TODO el rango histórico, ignorando el límite de 2000
+            const { data, error } = await supabase.from(SUPABASE_TABLE)
+                .select('*')
+                .gte('fecha', fechaDesde)
+                .lte('fecha', fechaHasta)
+                .order('fecha', { ascending: false });
+            
+            if (error) throw error;
+            setRegistrosBD(data || []);
+            // Nota: No limpiamos busquedaGlobal para que, si el usuario ya tenía un nombre escrito, 
+            // se aplique automáticamente a los nuevos resultados históricos.
+        } catch (error) {
+            console.error(error); alert("Error al buscar en el archivo histórico de la nube.");
+        } finally {
+            setCargando(false);
+        }
+    };
+
+    // MOTOR 2: Búsqueda Relámpago Local (Se ejecuta automáticamente al escribir)
     useEffect(() => {
         let resultado = registrosBD;
 
-        // 1. Filtro por Fecha
-        if (fechaDesde) resultado = resultado.filter(r => r.fecha >= fechaDesde);
-        if (fechaHasta) resultado = resultado.filter(r => r.fecha <= fechaHasta);
-
-        // 2. Filtro Global (Busca en cualquier columna)
         if (busquedaGlobal.trim()) {
             const termino = busquedaGlobal.toLowerCase();
             resultado = resultado.filter(r => 
@@ -139,10 +158,13 @@ const PanelAdmin = ({ onLogout }) => {
         }
 
         setRegistrosFiltrados(resultado);
-    }, [busquedaGlobal, fechaDesde, fechaHasta, registrosBD]);
+    }, [busquedaGlobal, registrosBD]);
 
-    const limpiarFiltros = () => {
-        setBusquedaGlobal(""); setFechaDesde(""); setFechaHasta("");
+    const limpiarTodo = () => {
+        setBusquedaGlobal(""); 
+        setFechaDesde(""); 
+        setFechaHasta("");
+        cargarRecientes(); // Vuelve a descargar los últimos 2000
     };
 
     const descargarExcelMaestro = () => {
@@ -220,33 +242,47 @@ const PanelAdmin = ({ onLogout }) => {
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-8">
                 <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
                     <h2 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                        <span>🔍</span> Buscador en Tiempo Real
+                        <span>⚡</span> Control de Búsqueda
                     </h2>
-                    <button type="button" onClick={limpiarFiltros} className="text-xs text-slate-400 hover:text-slate-800 transition-colors">Limpiar Búsqueda</button>
+                    <button type="button" onClick={limpiarTodo} className="text-xs text-slate-400 hover:text-slate-800 transition-colors font-medium">
+                        ↻ Reiniciar Todo
+                    </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div className="md:col-span-2">
-                        <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Búsqueda General</label>
-                        <input type="text" placeholder="Escribe un cliente, placa, municipio, negocio, código..." value={busquedaGlobal} onChange={e => setBusquedaGlobal(e.target.value)} className="w-full p-3 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none transition-all shadow-inner" />
-                    </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Búsqueda Relámpago */}
                     <div>
-                        <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Fecha Desde</label>
-                        <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} className="w-full p-3 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none transition-all" />
+                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">1. Filtro Rápido en Pantalla</label>
+                        <input type="text" placeholder="Escribe un cliente, placa, municipio, código de equipo..." value={busquedaGlobal} onChange={e => setBusquedaGlobal(e.target.value)} className="w-full p-3.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-slate-800 outline-none transition-all shadow-inner bg-slate-50" />
+                        <p className="text-[10px] text-slate-400 mt-2">Filtra instantáneamente sobre los resultados cargados abajo.</p>
                     </div>
-                    <div>
-                        <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Fecha Hasta</label>
-                        <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} className="w-full p-3 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-slate-800 outline-none transition-all" />
-                    </div>
+
+                    {/* Búsqueda Histórica Profunda */}
+                    <form onSubmit={buscarEnNube} className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider text-indigo-600">2. Descarga Histórica desde la Nube</label>
+                        <div className="flex flex-col sm:flex-row gap-3 items-end">
+                            <div className="flex-1 w-full">
+                                <label className="block text-[9px] font-semibold text-slate-500 mb-1 uppercase tracking-wider">Fecha Desde</label>
+                                <input type="date" required value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-indigo-600 outline-none bg-white" />
+                            </div>
+                            <div className="flex-1 w-full">
+                                <label className="block text-[9px] font-semibold text-slate-500 mb-1 uppercase tracking-wider">Fecha Hasta</label>
+                                <input type="date" required value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm text-slate-700 focus:ring-1 focus:ring-indigo-600 outline-none bg-white" />
+                            </div>
+                            <button type="submit" disabled={cargando} className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-xs font-bold tracking-widest uppercase hover:bg-indigo-700 transition-colors shadow-md w-full sm:w-auto h-[42px] whitespace-nowrap">
+                                {cargando ? "Extrayendo..." : "Buscar Rango"}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
 
             {registrosFiltrados.length > 0 && !cargando && (
                 <div className="flex flex-col md:flex-row justify-end gap-3 mb-6">
-                    <button onClick={descargarExcelMaestro} className="px-5 py-2.5 text-xs font-bold tracking-wider uppercase text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
+                    <button onClick={descargarExcelMaestro} className="px-5 py-2.5 text-xs font-bold tracking-wider uppercase text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm">
                         Descargar Excel Maestro
                     </button>
-                    <button onClick={descargarZip} disabled={descargandoZip} className={`px-5 py-2.5 text-xs font-bold tracking-wider uppercase bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors ${descargandoZip ? 'opacity-50' : ''}`}>
+                    <button onClick={descargarZip} disabled={descargandoZip} className={`px-5 py-2.5 text-xs font-bold tracking-wider uppercase bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all shadow-sm ${descargandoZip ? 'opacity-50' : ''}`}>
                         {descargandoZip ? "Procesando ZIP..." : "Descargar Archivos ZIP"}
                     </button>
                 </div>
@@ -268,8 +304,8 @@ const PanelAdmin = ({ onLogout }) => {
                         <tbody className="divide-y divide-slate-100">
                             {cargando ? (
                                 <tr>
-                                    <td colSpan="6" className="p-16 text-center text-slate-400 text-sm">
-                                        Cargando base de datos desde la nube...
+                                    <td colSpan="6" className="p-16 text-center text-slate-500 text-sm font-medium">
+                                        <div className="animate-pulse">Sincronizando con la nube de Transportes Del Sur...</div>
                                     </td>
                                 </tr>
                             ) : registrosFiltrados.length === 0 ? (

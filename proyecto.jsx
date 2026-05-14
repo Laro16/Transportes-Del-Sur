@@ -89,12 +89,10 @@ const PanelAdmin = ({ onLogout }) => {
     const [cargando, setCargando] = useState(true);
     const [descargandoZip, setDescargandoZip] = useState(false);
 
-    // Estados de Búsqueda
     const [busquedaGlobal, setBusquedaGlobal] = useState("");
     const [fechaDesde, setFechaDesde] = useState("");
     const [fechaHasta, setFechaHasta] = useState("");
 
-    // Función para traer los últimos 2000 (Carga inicial o al limpiar)
     const cargarRecientes = async () => {
         setCargando(true);
         try {
@@ -109,18 +107,15 @@ const PanelAdmin = ({ onLogout }) => {
         }
     };
 
-    // Descargar al abrir el panel
     useEffect(() => {
         cargarRecientes();
     }, []);
 
-    // MOTOR 1: Búsqueda Histórica en la Nube (Al hacer click en el botón)
     const buscarEnNube = async (e) => {
         e.preventDefault();
         setCargando(true);
         try {
             const supabase = getSupabase();
-            // Trae TODO el rango histórico, ignorando el límite de 2000
             const { data, error } = await supabase.from(SUPABASE_TABLE)
                 .select('*')
                 .gte('fecha', fechaDesde)
@@ -129,8 +124,6 @@ const PanelAdmin = ({ onLogout }) => {
             
             if (error) throw error;
             setRegistrosBD(data || []);
-            // Nota: No limpiamos busquedaGlobal para que, si el usuario ya tenía un nombre escrito, 
-            // se aplique automáticamente a los nuevos resultados históricos.
         } catch (error) {
             console.error(error); alert("Error al buscar en el archivo histórico de la nube.");
         } finally {
@@ -138,10 +131,8 @@ const PanelAdmin = ({ onLogout }) => {
         }
     };
 
-    // MOTOR 2: Búsqueda Relámpago Local (Se ejecuta automáticamente al escribir)
     useEffect(() => {
         let resultado = registrosBD;
-
         if (busquedaGlobal.trim()) {
             const termino = busquedaGlobal.toLowerCase();
             resultado = resultado.filter(r => 
@@ -156,15 +147,12 @@ const PanelAdmin = ({ onLogout }) => {
                 (r.contrato && r.contrato.toLowerCase().includes(termino))
             );
         }
-
         setRegistrosFiltrados(resultado);
     }, [busquedaGlobal, registrosBD]);
 
     const limpiarTodo = () => {
-        setBusquedaGlobal(""); 
-        setFechaDesde(""); 
-        setFechaHasta("");
-        cargarRecientes(); // Vuelve a descargar los últimos 2000
+        setBusquedaGlobal(""); setFechaDesde(""); setFechaHasta("");
+        cargarRecientes();
     };
 
     const descargarExcelMaestro = () => {
@@ -250,14 +238,12 @@ const PanelAdmin = ({ onLogout }) => {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* Búsqueda Relámpago */}
                     <div>
                         <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">1. Filtro Rápido en Pantalla</label>
                         <input type="text" placeholder="Escribe un cliente, placa, municipio, código de equipo..." value={busquedaGlobal} onChange={e => setBusquedaGlobal(e.target.value)} className="w-full p-3.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:ring-2 focus:ring-slate-800 outline-none transition-all shadow-inner bg-slate-50" />
                         <p className="text-[10px] text-slate-400 mt-2">Filtra instantáneamente sobre los resultados cargados abajo.</p>
                     </div>
 
-                    {/* Búsqueda Histórica Profunda */}
                     <form onSubmit={buscarEnNube} className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                         <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider text-indigo-600">2. Descarga Histórica desde la Nube</label>
                         <div className="flex flex-col sm:flex-row gap-3 items-end">
@@ -504,7 +490,8 @@ const VistaTecnico = ({ onLogout }) => {
                         muni = data.address.city || data.address.town || data.address.village || "";
                         depto = data.address.state || "";
                         const lugar = [muni, depto].filter(Boolean).join(", ");
-                        if (lugar) texto = `${lugar} (${lat}, ${lon})`;
+                        // AQUÍ SE QUITARON LOS PARÉNTESIS DE LAS COORDENADAS
+                        if (lugar) texto = `${lugar}, ${lat}, ${lon}`;
                     }
                 } catch (e) {}
                 

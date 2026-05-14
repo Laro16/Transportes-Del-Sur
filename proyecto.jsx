@@ -19,8 +19,17 @@ const getSupabase = () => {
     return window.supabaseClient;
 };
 
+// Función global para voltear la fecha a Día/Mes/Año en todo el sistema
+const formatearFechaDisplay = (fechaISO) => {
+    if (!fechaISO) return "";
+    const partes = fechaISO.split("-");
+    if (partes.length !== 3) return fechaISO;
+    const [anio, mes, dia] = partes;
+    return `${dia}/${mes}/${anio}`;
+};
+
 // ==========================================
-// COMPONENTES DE INTERFAZ EXTERNOS (CORRIGE LA PÉRDIDA DE FOCO)
+// COMPONENTES DE INTERFAZ EXTERNOS
 // ==========================================
 const InputForm = ({ label, type = "text", name, req = true, opts, value, onChange, error }) => (
     <div className="mb-5">
@@ -106,16 +115,28 @@ const PanelAdmin = ({ onLogout }) => {
         if (registros.length === 0) return alert("No hay registros para descargar.");
         const wb = window.XLSX.utils.book_new();
         const datosMaestros = registros.map(r => ({
-            "ID Registro": r.registro_id, "Fecha": r.fecha, "Transportista": r.transportista,
-            "Placa": r.placa, "Negocio": r.negocio, "Cliente": r.cliente, "Teléfono": r.telefono,
-            "Contrato": r.contrato, "Código Equipo": r.codigo, "Serie Equipo": r.serie,
-            "Modelo Equipo": r.modelo, "Tipo Equipo": r.tipo, "Ubicación / GPS": r.ubicacion,
-            "Latitud": r.latitud, "Longitud": r.longitud, "Enlace Reporte PDF": r.pdf_url,
-            "Enlace Evidencia JPG": r.imagen_url, "Enlace Excel Individual": r.excel_url
+            "ID Registro": r.registro_id, 
+            "Fecha": formatearFechaDisplay(r.fecha), 
+            "Transportista": r.transportista,
+            "Placa": r.placa, 
+            "Negocio": r.negocio, 
+            "Cliente": r.cliente, 
+            "Teléfono": r.telefono,
+            "Contrato": r.contrato, 
+            "Código Equipo": r.codigo, 
+            "Serie Equipo": r.serie,
+            "Modelo Equipo": r.modelo, 
+            "Tipo Equipo": r.tipo, 
+            "Ubicación / GPS": r.ubicacion,
+            "Latitud": r.latitud, 
+            "Longitud": r.longitud, 
+            "Enlace Reporte PDF": r.pdf_url,
+            "Enlace Evidencia JPG": r.imagen_url, 
+            "Enlace Excel Individual": r.excel_url
         }));
         const ws = window.XLSX.utils.json_to_sheet(datosMaestros);
         window.XLSX.utils.book_append_sheet(wb, ws, "Reporte Maestro");
-        window.XLSX.writeFile(wb, `Reporte_TransportesDelSur_${fechaDesde || 'Todo'}_a_${fechaHasta || 'Todo'}.xlsx`);
+        window.XLSX.writeFile(wb, `Reporte_TransportesDelSur_${formatearFechaDisplay(fechaDesde) || 'Todo'}_a_${formatearFechaDisplay(fechaHasta) || 'Todo'}.xlsx`);
     };
 
     const descargarZip = async () => {
@@ -125,7 +146,7 @@ const PanelAdmin = ({ onLogout }) => {
             const zip = new window.JSZip();
             for (const reg of registros) {
                 const idCorto = reg.registro_id.slice(0, 5);
-                const nombreCarpeta = `Instalacion_${reg.negocio}_${reg.fecha}_${idCorto}`.replace(/[^a-z0-9_]/gi, '_');
+                const nombreCarpeta = `Instalacion_${reg.negocio}_${formatearFechaDisplay(reg.fecha)}_${idCorto}`.replace(/[^a-z0-9_]/gi, '_');
                 const carpetaRegistro = zip.folder(nombreCarpeta);
                 const agregarArchivo = async (url, nombre) => {
                     if (!url) return;
@@ -140,7 +161,7 @@ const PanelAdmin = ({ onLogout }) => {
                 await agregarArchivo(reg.excel_url, `Datos_${reg.negocio}.xlsx`);
             }
             const contenidoZip = await zip.generateAsync({ type: "blob" });
-            window.saveAs(contenidoZip, `Archivos_Completos_${fechaDesde || 'Todo'}.zip`);
+            window.saveAs(contenidoZip, `Archivos_Completos_${formatearFechaDisplay(fechaDesde) || 'Todo'}.zip`);
         } catch (error) {
             console.error(error); alert("Hubo un problema al generar el archivo ZIP.");
         } finally {
@@ -160,7 +181,7 @@ const PanelAdmin = ({ onLogout }) => {
                 </button>
             </header>
 
-            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100 mb-8">
+            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200 mb-8">
                 <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-widest mb-6">Filtros de Búsqueda</h2>
                 <form onSubmit={buscarRegistros} className="flex flex-wrap gap-5 items-end">
                     <div className="flex-1 min-w-[200px]">
@@ -178,21 +199,21 @@ const PanelAdmin = ({ onLogout }) => {
             </div>
 
             {registros.length > 0 && (
-                <div className="flex flex-col md:flex-row gap-4 mb-8">
-                    <button onClick={descargarExcelMaestro} className="flex-1 bg-emerald-600 text-white font-medium py-4 px-6 rounded-2xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
-                        <span>📊</span> Descargar Excel Maestro
+                <div className="flex flex-col md:flex-row gap-5 mb-8">
+                    <button onClick={descargarExcelMaestro} className="flex-1 bg-white border border-slate-200 text-slate-700 font-medium py-3.5 px-6 rounded-xl shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex items-center justify-center gap-3">
+                        <span className="text-emerald-600 text-lg">📊</span> Excel Maestro (Todas las columnas)
                     </button>
-                    <button onClick={descargarZip} disabled={descargandoZip} className={`flex-1 ${descargandoZip ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700 hover:-translate-y-0.5'} text-white font-medium py-4 px-6 rounded-2xl shadow-lg shadow-indigo-600/20 transition-all flex items-center justify-center gap-2`}>
-                        <span>📦</span> {descargandoZip ? "Empaquetando ZIP..." : "Descargar Todo en ZIP"}
+                    <button onClick={descargarZip} disabled={descargandoZip} className={`flex-1 bg-white border border-slate-200 text-slate-700 font-medium py-3.5 px-6 rounded-xl shadow-sm hover:shadow-md hover:border-slate-300 transition-all flex items-center justify-center gap-3 ${descargandoZip ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                        <span className="text-indigo-600 text-lg">📦</span> {descargandoZip ? "Empaquetando ZIP..." : "Descargar Todo en ZIP"}
                     </button>
                 </div>
             )}
 
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse min-w-[1200px]">
                         <thead>
-                            <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-100">
+                            <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b-2 border-slate-200">
                                 <th className="p-5 font-semibold">Fecha</th>
                                 <th className="p-5 font-semibold">Negocio / Cliente</th>
                                 <th className="p-5 font-semibold">Contacto</th>
@@ -202,7 +223,7 @@ const PanelAdmin = ({ onLogout }) => {
                                 <th className="p-5 font-semibold text-center">Archivos</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-50">
+                        <tbody className="divide-y divide-slate-200">
                             {registros.length === 0 ? (
                                 <tr>
                                     <td colSpan="7" className="p-16 text-center text-slate-400">
@@ -212,8 +233,8 @@ const PanelAdmin = ({ onLogout }) => {
                                 </tr>
                             ) : (
                                 registros.map((reg) => (
-                                    <tr key={reg.registro_id} className="hover:bg-slate-50/50 transition-colors text-sm text-slate-600">
-                                        <td className="p-5 font-medium text-slate-900">{reg.fecha}</td>
+                                    <tr key={reg.registro_id} className="hover:bg-slate-50/70 transition-colors text-sm text-slate-600">
+                                        <td className="p-5 font-medium text-slate-900">{formatearFechaDisplay(reg.fecha)}</td>
                                         <td className="p-5">
                                             <p className="font-semibold text-slate-900">{reg.negocio}</p>
                                             <p className="text-xs text-slate-500 mt-0.5">{reg.cliente}</p>
@@ -223,22 +244,22 @@ const PanelAdmin = ({ onLogout }) => {
                                             <p className="text-xs text-slate-400 mt-0.5">Contrato: {reg.contrato}</p>
                                         </td>
                                         <td className="p-5">
-                                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 mb-1">
+                                            <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 mb-1 border border-slate-200">
                                                 {reg.transportista}
                                             </span>
-                                            <p className="text-xs text-slate-500">{reg.placa}</p>
+                                            <p className="text-xs text-slate-500 mt-1">{reg.placa}</p>
                                         </td>
                                         <td className="p-5">
-                                            <p className="font-medium">{reg.modelo}</p>
+                                            <p className="font-medium text-slate-800">{reg.modelo}</p>
                                             <p className="text-xs text-slate-500 mt-0.5">{reg.tipo}</p>
                                         </td>
                                         <td className="p-5 text-xs text-slate-500 max-w-[200px] truncate" title={reg.ubicacion}>
                                             {reg.ubicacion}
                                         </td>
                                         <td className="p-5 flex justify-center gap-2">
-                                            {reg.pdf_url ? <a href={reg.pdf_url} target="_blank" rel="noreferrer" className="text-rose-600 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">PDF</a> : <span className="text-slate-200 text-xs px-3 py-1.5">-</span>}
-                                            {reg.excel_url ? <a href={reg.excel_url} target="_blank" rel="noreferrer" className="text-emerald-600 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">XLS</a> : <span className="text-slate-200 text-xs px-3 py-1.5">-</span>}
-                                            {reg.imagen_url ? <a href={reg.imagen_url} target="_blank" rel="noreferrer" className="text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">IMG</a> : <span className="text-slate-200 text-xs px-3 py-1.5">-</span>}
+                                            {reg.pdf_url ? <a href={reg.pdf_url} target="_blank" rel="noreferrer" className="text-rose-600 bg-rose-50 border border-rose-100 hover:bg-rose-100 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shadow-sm">PDF</a> : <span className="text-slate-200 text-xs px-3 py-1.5">-</span>}
+                                            {reg.excel_url ? <a href={reg.excel_url} target="_blank" rel="noreferrer" className="text-emerald-600 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shadow-sm">XLS</a> : <span className="text-slate-200 text-xs px-3 py-1.5">-</span>}
+                                            {reg.imagen_url ? <a href={reg.imagen_url} target="_blank" rel="noreferrer" className="text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shadow-sm">IMG</a> : <span className="text-slate-200 text-xs px-3 py-1.5">-</span>}
                                         </td>
                                     </tr>
                                 ))
@@ -325,11 +346,8 @@ const VistaTecnico = ({ onLogout }) => {
         });
     };
 
-    const formatearFechaHora = (date = new Date()) => {
-        return {
-            fecha: new Intl.DateTimeFormat("es-GT", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date),
-            hora: new Intl.DateTimeFormat("es-GT", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(date)
-        };
+    const formatearHoraSolo = (date = new Date()) => {
+        return new Intl.DateTimeFormat("es-GT", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(date);
     };
 
     const fitTextSingleLine = (ctx, text, maxWidth) => {
@@ -369,9 +387,16 @@ const VistaTecnico = ({ onLogout }) => {
         const file = e.target.files[0]; if (!file) return;
         try {
             const imgComp = await comprimirImagen(file);
-            const { fecha, hora } = formatearFechaHora(new Date());
+            const hora = formatearHoraSolo(new Date());
             const cand = gpsInfo.direccion || formData.ubicacion || "";
-            const final = await estamparDatosEnImagen(imgComp, { negocio: formData.negocio?.trim() || "NEGOCIO", fecha, hora, direccion: (!cand || /obteniendo/i.test(String(cand))) ? "SIN UBICACIÓN" : cand, lat: gpsInfo.lat || "N/D", lon: gpsInfo.lon || "N/D" });
+            const final = await estamparDatosEnImagen(imgComp, { 
+                negocio: formData.negocio?.trim() || "NEGOCIO", 
+                fecha: formatearFechaDisplay(formData.fecha) || "Sin Fecha", 
+                hora, 
+                direccion: (!cand || /obteniendo/i.test(String(cand))) ? "SIN UBICACIÓN" : cand, 
+                lat: gpsInfo.lat || "N/D", 
+                lon: gpsInfo.lon || "N/D" 
+            });
             setFotos(prev => ({ ...prev, [nombre]: final }));
             setErrors(prev => ({ ...prev, [`foto_${nombre}`]: "" }));
         } catch (error) { alert("Error al procesar imagen."); } finally { e.target.value = ""; }
@@ -425,7 +450,11 @@ const VistaTecnico = ({ onLogout }) => {
             const imageBlob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.88));
 
             const doc = new window.jspdf.jsPDF(); doc.setFontSize(18); doc.text("Reporte de Instalación", 15, 20); doc.setFontSize(12);
-            doc.autoTable({ startY: 30, head: [["Campo", "Información"]], body: Object.entries(formData).map(([k, v]) => [k.toUpperCase(), String(v || "")]) });
+            
+            // Voltear la fecha en el PDF 
+            const dataParaPDF = Object.entries(formData).map(([k, v]) => [k.toUpperCase(), k === 'fecha' ? formatearFechaDisplay(v) : String(v || "")]);
+            doc.autoTable({ startY: 30, head: [["Campo", "Información"]], body: dataParaPDF });
+            
             for (const [k, b64] of Object.entries(fotos)) {
                 if (!b64) continue; doc.addPage(); doc.text(`Evidencia: ${PHOTO_LABELS[k] || k}`, 15, 20);
                 const props = doc.getImageProperties(b64); const w = doc.internal.pageSize.getWidth(); const h = doc.internal.pageSize.getHeight();
@@ -436,7 +465,10 @@ const VistaTecnico = ({ onLogout }) => {
             const pdfBlob = doc.output("blob");
 
             const wb = window.XLSX.utils.book_new();
-            window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet([formData]), "Registro");
+            
+            // Voltear la fecha en el Excel individual
+            const registroParaExcel = { ...formData, fecha: formatearFechaDisplay(formData.fecha) };
+            window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet([registroParaExcel]), "Registro");
             window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.json_to_sheet(Object.entries(PHOTO_LABELS).map(([k, l]) => ({ Evidencia: l, Estado: fotos[k] ? "Adjunta" : "Pendiente" }))), "Evidencias");
             const xlsxBlob = new Blob([window.XLSX.write(wb, { bookType: "xlsx", type: "array" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 
@@ -469,7 +501,7 @@ const VistaTecnico = ({ onLogout }) => {
             <div id="molde-imagen-whatsapp" className="fixed top-0 left-[-9999px] bg-white p-10 w-[1200px]">
                 <div className="bg-slate-900 text-white p-6 text-center rounded-xl mb-8"><h2 className="text-4xl font-bold mb-2">Transportes Del Sur</h2><p className="text-xl font-light tracking-widest uppercase">Reporte de Instalación</p></div>
                 <div className="grid grid-cols-2 gap-6 mb-8 bg-slate-50 p-6 rounded-xl border-2 border-slate-200 text-xl text-slate-700">
-                    <p><span className="font-bold text-slate-900">Fecha:</span> {formData.fecha}</p><p><span className="font-bold text-slate-900">Transportista:</span> {formData.transportista}</p>
+                    <p><span className="font-bold text-slate-900">Fecha:</span> {formatearFechaDisplay(formData.fecha)}</p><p><span className="font-bold text-slate-900">Transportista:</span> {formData.transportista}</p>
                     <p><span className="font-bold text-slate-900">Placa:</span> {formData.placa}</p><p><span className="font-bold text-slate-900">Negocio:</span> {formData.negocio}</p>
                     <p><span className="font-bold text-slate-900">Cliente:</span> {formData.cliente}</p><p><span className="font-bold text-slate-900">Teléfono:</span> {formData.telefono}</p>
                     <p className="col-span-2"><span className="font-bold text-slate-900">Ubicación:</span> {formData.ubicacion}</p>

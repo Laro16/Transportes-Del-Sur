@@ -633,6 +633,45 @@ const VistaTecnico = ({ onLogout }) => {
             }]);
             if (insErr) throw insErr;
 
+            // ===============================================
+            // INYECCIÓN DE WHATSAPP AUTOMÁTICO
+            // ===============================================
+            
+            // Construimos la ubicación completa si existe el municipio
+            const ubicacionParaWhatsApp = formData.municipio 
+                ? `${formData.municipio}, ${formData.departamento} (${formData.ubicacion})`
+                : formData.ubicacion;
+
+            // Creamos el mensaje con la estructura idéntica a tu foto de referencia
+            const mensajeWhatsApp = `*${formData.tipo_movimiento} de equipo frío*
+*Contrato/Orden:* ${formData.contrato}
+
+*Cliente:* ${formData.cliente}
+*Encargado:* ${formData.transportista}
+*Nombre del Negocio:* ${formData.negocio}
+
+*Dirección:* ${ubicacionParaWhatsApp}
+
+*Tel:* ${formData.telefono}
+
+*Modelo:* ${formData.modelo}
+*Serie:* ${formData.serie}
+*Código:* ${formData.codigo}
+
+📄 *Ver PDF:*
+${p.publicUrl}
+
+📊 *Ver Excel:*
+${x.publicUrl}
+
+🖼️ *Ver Imagen Resumen:*
+${i.publicUrl}`;
+
+            // Abrimos WhatsApp con el mensaje codificado
+            window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(mensajeWhatsApp)}`, '_blank');
+            
+            // ===============================================
+
             skipDraftSaveRef.current = true; clearDraft(); resetForm();
             setTimeout(() => { skipDraftSaveRef.current = false; }, 0);
             alert(`¡Éxito! Reporte de ${formData.tipo_movimiento} guardado en la nube.`);
